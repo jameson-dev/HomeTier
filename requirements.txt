@@ -1,0 +1,9 @@
+Flask==2.3.3
+SQLAlchemy==2.0.21
+scapy==2.5.0
+python-nmap==0.7.1
+networkx==3.1
+pyvis==0.3.2
+APScheduler==3.10.4
+Werkzeug==2.3.7
+requests==2.31.0
