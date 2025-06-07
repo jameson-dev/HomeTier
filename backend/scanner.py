@@ -254,12 +254,39 @@ class NetworkScanner:
             return []
     
     def get_hostname(self, ip_address):
-        """Get hostname from IP address"""
+        """Get hostname from IP address using multiple methods"""
+        # Method 1: Standard reverse DNS lookup
         try:
             hostname = socket.gethostbyaddr(ip_address)[0]
-            return hostname
+            if hostname and not hostname.startswith(ip_address):
+                return hostname.split('.')[0]  # Return just the host part
         except (socket.herror, socket.gaierror):
-            return None
+            pass
+        
+        # Method 2: Try nslookup command
+        try:
+            result = subprocess.run(['nslookup', ip_address], 
+                                capture_output=True, text=True, timeout=3)
+            for line in result.stdout.splitlines():
+                if 'name =' in line.lower():
+                    hostname = line.split('=')[1].strip().rstrip('.')
+                    return hostname.split('.')[0]
+        except:
+            pass
+        
+        # Method 3: Try netbios/SMB name (for Windows devices)
+        try:
+            result = subprocess.run(['nmblookup', '-A', ip_address], 
+                                capture_output=True, text=True, timeout=3)
+            for line in result.stdout.splitlines():
+                if '<00>' in line and 'GROUP' not in line:
+                    hostname = line.split()[0].strip()
+                    if hostname and hostname != '*':
+                        return hostname
+        except:
+            pass
+        
+        return None
     
     def scan_network(self):
         """Main network scanning function"""
