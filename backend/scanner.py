@@ -32,8 +32,13 @@ class NetworkScanner:
             else:
                 print("Downloading IEEE OUI database...")
                 # Download the latest OUI database
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Linux; x86_64) AppleWebKit/537.36 Network Inventory Manager',
+                    'Accept': 'text/plain',
+                }
                 response = requests.get(
-                    'http://standards-oui.ieee.org/oui/oui.txt',
+                    'https://standards-oui.ieee.org/oui/oui.txt',
+                    headers=headers,
                     timeout=30
                 )
                 response.raise_for_status()
