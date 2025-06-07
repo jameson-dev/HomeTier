@@ -168,36 +168,55 @@ class NetworkScanner:
             return []
     
     def ping_scan(self, network_range=None):
-        """Perform ping scan to discover active hosts"""
+        """Perform ping scan using host system's network stack"""
         if network_range is None:
             network_range = self.get_network_range()
             
         print(f"Scanning network range: {network_range}")
         
         try:
-            # Create ARP request
-            arp_request = scapy.ARP(pdst=network_range)
-            broadcast = scapy.Ether(dst="ff:ff:ff:ff:ff:ff")
-            arp_request_broadcast = broadcast / arp_request
+            # Use nmap first to populate ARP table, then read host ARP
+            print("Using nmap + host ARP method for Ubuntu...")
             
-            # Send request and receive response
-            answered_list = scapy.srp(arp_request_broadcast, timeout=2, verbose=False)[0]
+            # Step 1: Use nmap to discover live hosts
+            self.nm.scan(hosts=network_range, arguments='-sn --host-timeout 2s')
             
+            # Step 2: Read ARP table from host system (works even in container)
             devices = []
-            for element in answered_list:
-                device = {
-                    'ip': element[1].psrc,
-                    'mac': element[1].hwsrc,
-                    'hostname': self.get_hostname(element[1].psrc),
-                    'vendor': self.get_vendor_from_mac(element[1].hwsrc)
-                }
-                devices.append(device)
+            live_ips = [host for host in self.nm.all_hosts() if self.nm[host].state() == 'up']
+            
+            for ip in live_ips:
+                # Try to get MAC from multiple sources
+                mac = self.get_mac_from_proc(ip) or self.get_mac_for_ip(ip)
                 
+                if mac:
+                    device = {
+                        'ip': ip,
+                        'mac': mac,
+                        'hostname': self.get_hostname(ip),
+                        'vendor': self.get_vendor_from_mac(mac)
+                    }
+                    devices.append(device)
+                    
             return devices
             
         except Exception as e:
-            print(f"Error during ping scan: {e}")
-            return self.fallback_scan(network_range)
+            print(f"Error during scan: {e}")
+            return []
+
+    def get_mac_from_proc(self, ip):
+        """Try to get MAC from /proc/net/arp (often works in containers)"""
+        try:
+            with open('/proc/net/arp', 'r') as f:
+                for line in f:
+                    parts = line.split()
+                    if len(parts) >= 4 and parts[0] == ip:
+                        mac = parts[3]
+                        if mac != "00:00:00:00:00:00" and ":" in mac:
+                            return mac.lower()
+        except:
+            pass
+        return None
     
     def fallback_scan(self, network_range):
         """Fallback scan using nmap if scapy fails"""

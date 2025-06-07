@@ -2,12 +2,11 @@ services:
   hometier:
     build: .
     container_name: hometier
-    ports:
-      - "5000:5000"
     volumes:
       - ./data:/app/data
     restart: unless-stopped
     privileged: true
+    network_mode: host
     env_file:
       - .env  # Load environment variables from .env file
     environment:
