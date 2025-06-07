@@ -255,16 +255,17 @@ class NetworkScanner:
             return None
     
     def scan_network(self):
-        """Main network scanning function with WSL2 support"""
+        """Main network scanning function"""
         print(f"Starting network scan at {datetime.now()}")
         
         network_range = self.get_network_range()
         
-        # Check if we're in WSL2 and use appropriate scanning method
-        if self.detect_wsl2():
-            devices = self.wsl2_ping_scan(network_range)
-        else:
-            devices = self.ping_scan(network_range)
+        # Try multiple methods for Ubuntu
+        devices = self.ping_scan(network_range)
+        
+        if not devices:
+            print("Trying netlink method...")
+            devices = self.netlink_scan(network_range)
         
         # Process discovered devices
         processed_devices = []
