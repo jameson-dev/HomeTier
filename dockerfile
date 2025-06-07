@@ -5,6 +5,9 @@ RUN apt-get update && apt-get install -y \
     nmap \
     net-tools \
     iputils-ping \
+    iproute2 \
+    dnsutils \
+    samba-common-bin \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
