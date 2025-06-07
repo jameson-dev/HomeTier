@@ -25,9 +25,9 @@ function showNotification(message, type = 'info') {
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    
+
     document.body.appendChild(notification);
-    
+
     setTimeout(() => {
         if (notification.parentElement) {
             notification.remove();
@@ -40,32 +40,32 @@ async function loadDashboardData() {
     try {
         const response = await fetch('/api/devices');
         const devices = await response.json();
-        
-        const activeDevices = devices.filter(d => 
+
+        const activeDevices = devices.filter(d =>
             new Date() - new Date(d.last_seen) < 3600000 // Last hour
         ).length;
-        
-        const newDevices = devices.filter(d => 
+
+        const newDevices = devices.filter(d =>
             new Date() - new Date(d.first_seen) < 3600000 // Last hour
         ).length;
-        
+
         // Safely update elements if they exist
         const activeCount = document.getElementById('active-devices-count');
         if (activeCount) activeCount.textContent = activeDevices;
-        
+
         const newCount = document.getElementById('new-devices-count');
         if (newCount) newCount.textContent = newDevices;
-        
+
         // Update last scan time
         if (devices.length > 0) {
             const lastScan = Math.max(...devices.map(d => new Date(d.last_seen)));
             const lastScanTime = document.getElementById('last-scan-time');
             const lastScanDisplay = document.getElementById('last-scan-display');
-            
+
             if (lastScanTime) lastScanTime.textContent = formatDateTime(lastScan);
             if (lastScanDisplay) lastScanDisplay.textContent = formatDateTime(lastScan);
         }
-        
+
     } catch (error) {
         console.error('Error loading dashboard data:', error);
         showNotification('Error loading dashboard data', 'danger');
@@ -77,7 +77,7 @@ async function loadRecentDevices() {
         const response = await fetch('/api/devices');
         const devices = await response.json();
         currentDevices = devices;
-        
+
         const tbody = document.getElementById('devices-table');
         if (devices.length === 0) {
             tbody.innerHTML = `
@@ -89,12 +89,12 @@ async function loadRecentDevices() {
             `;
             return;
         }
-        
+
         tbody.innerHTML = devices.slice(0, 10).map(device => `
             <tr>
                 <td>${device.ip_address || 'N/A'}</td>
                 <td><code>${device.mac_address}</code></td>
-                <td>${device.hostname || 'Unknown'}</td>
+                <td>${device.hostname && device.hostname !== 'Unknown' ? device.hostname : ''}</td>
                 <td>${device.vendor || 'Unknown'}</td>
                 <td>${formatDateTime(device.first_seen)}</td>
                 <td>
@@ -107,7 +107,7 @@ async function loadRecentDevices() {
                 </td>
             </tr>
         `).join('');
-        
+
     } catch (error) {
         console.error('Error loading devices:', error);
         showNotification('Error loading devices', 'danger');
@@ -116,16 +116,16 @@ async function loadRecentDevices() {
 
 async function startNetworkScan() {
     if (scanInProgress) return;
-    
+
     scanInProgress = true;
     const scanBtn = document.getElementById('scan-btn');
     const scanProgress = document.getElementById('scan-progress');
-    
+
     // Update UI
     scanBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Scanning...';
     scanBtn.disabled = true;
     scanProgress.style.display = 'block';
-    
+
     try {
         const response = await fetch('/api/scan', {
             method: 'POST',
@@ -133,22 +133,22 @@ async function startNetworkScan() {
                 'Content-Type': 'application/json'
             }
         });
-        
+
         const result = await response.json();
-        
+
         if (result.status === 'success') {
             showNotification(
-                `Scan completed! Found ${result.devices_found} devices.`, 
+                `Scan completed! Found ${result.devices_found} devices.`,
                 'success'
             );
-            
+
             // Refresh dashboard and device list
             await loadDashboardData();
             await loadRecentDevices();
         } else {
             showNotification(`Scan failed: ${result.message}`, 'danger');
         }
-        
+
     } catch (error) {
         console.error('Error during scan:', error);
         showNotification('Error during network scan', 'danger');
@@ -165,11 +165,11 @@ async function startNetworkScan() {
 function addToInventory(deviceId) {
     const device = currentDevices.find(d => d.id === deviceId);
     if (!device) return;
-    
+
     // Populate modal with device info
     document.getElementById('deviceId').value = deviceId;
     document.getElementById('deviceName').value = device.hostname || `Device ${device.ip_address}`;
-    
+
     // Pre-select category based on vendor
     const category = document.getElementById('category');
     if (device.vendor) {
@@ -182,7 +182,7 @@ function addToInventory(deviceId) {
             category.value = 'Computer';
         }
     }
-    
+
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById('addToInventoryModal'));
     modal.show();
@@ -191,28 +191,28 @@ function addToInventory(deviceId) {
 async function saveToInventory() {
     const form = document.getElementById('inventoryForm');
     const formData = new FormData(form);
-    
+
     try {
         const response = await fetch('/api/inventory', {
             method: 'POST',
             body: formData
         });
-        
+
         const result = await response.json();
-        
+
         if (result.status === 'success') {
             showNotification('Device added to inventory successfully!', 'success');
-            
+
             // Close modal and refresh data
             const modal = bootstrap.Modal.getInstance(document.getElementById('addToInventoryModal'));
             modal.hide();
-            
+
             await loadDashboardData();
             await loadRecentDevices();
         } else {
             showNotification(`Error: ${result.message}`, 'danger');
         }
-        
+
     } catch (error) {
         console.error('Error saving to inventory:', error);
         showNotification('Error saving device to inventory', 'danger');
@@ -221,21 +221,21 @@ async function saveToInventory() {
 
 async function ignoreDevice(deviceId) {
     if (!confirm('Are you sure you want to ignore this device?')) return;
-    
+
     try {
         const response = await fetch(`/api/devices/${deviceId}/ignore`, {
             method: 'POST'
         });
-        
+
         const result = await response.json();
-        
+
         if (result.status === 'success') {
             showNotification('Device ignored successfully', 'info');
             await loadRecentDevices();
         } else {
             showNotification(`Error: ${result.message}`, 'danger');
         }
-        
+
     } catch (error) {
         console.error('Error ignoring device:', error);
         showNotification('Error ignoring device', 'danger');
@@ -247,7 +247,7 @@ function refreshDevices() {
 }
 
 // Event listeners
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Bind scan button
     const scanBtn = document.getElementById('scan-btn');
     if (scanBtn) {
@@ -268,10 +268,10 @@ async function loadInventoryData() {
         const response = await fetch('/api/inventory');
         const inventory = await response.json();
         currentInventory = inventory;
-        
+
         updateInventoryTable(inventory);
         updateInventoryCount(inventory.length);
-        
+
     } catch (error) {
         console.error('Error loading inventory:', error);
         showNotification('Error loading inventory data', 'danger');
@@ -280,7 +280,7 @@ async function loadInventoryData() {
 
 function updateInventoryTable(inventory) {
     const tbody = document.getElementById('inventory-table');
-    
+
     if (inventory.length === 0) {
         tbody.innerHTML = `
             <tr>
@@ -291,7 +291,7 @@ function updateInventoryTable(inventory) {
         `;
         return;
     }
-    
+
     tbody.innerHTML = inventory.map(item => `
         <tr>
             <td>
@@ -312,6 +312,7 @@ function updateInventoryTable(inventory) {
             <td>
                 ${item.ip_address ? `IP: ${item.ip_address}<br>` : ''}
                 ${item.mac_address ? `<code>${item.mac_address}</code>` : 'Not connected'}
+                ${item.hostname && item.hostname !== 'Unknown' ? `<br>${item.hostname}` : ''}
             </td>
             <td>
                 <button class="btn btn-sm btn-outline-primary me-1" onclick="editInventoryItem(${item.id})">
@@ -327,11 +328,11 @@ function updateInventoryTable(inventory) {
 
 function getWarrantyStatus(warrantyExpiry) {
     if (!warrantyExpiry) return '<span class="text-muted">Unknown</span>';
-    
+
     const expiry = new Date(warrantyExpiry);
     const now = new Date();
     const daysUntilExpiry = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
-    
+
     if (daysUntilExpiry < 0) {
         return '<span class="text-danger"><i class="fas fa-times-circle"></i> Expired</span>';
     } else if (daysUntilExpiry <= 30) {
@@ -351,29 +352,29 @@ function updateInventoryCount(count) {
 async function saveNewInventory() {
     const form = document.getElementById('newInventoryForm');
     const formData = new FormData(form);
-    
+
     try {
         const response = await fetch('/api/inventory', {
             method: 'POST',
             body: formData
         });
-        
+
         const result = await response.json();
-        
+
         if (result.status === 'success') {
             showNotification('Device added to inventory successfully!', 'success');
-            
+
             // Close modal and refresh data
             const modal = bootstrap.Modal.getInstance(document.getElementById('addInventoryModal'));
             modal.hide();
             form.reset();
-            
+
             await loadInventoryData();
-            
+
         } else {
             showNotification(`Error: ${result.message}`, 'danger');
         }
-        
+
     } catch (error) {
         console.error('Error saving inventory:', error);
         showNotification('Error saving to inventory', 'danger');
