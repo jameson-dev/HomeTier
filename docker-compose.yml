@@ -6,7 +6,6 @@ services:
       - ./data:/app/data
     restart: unless-stopped
     privileged: true
-    network_mode: host
     env_file:
       - .env  # Load environment variables from .env file
     environment:
