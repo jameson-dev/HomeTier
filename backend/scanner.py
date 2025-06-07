@@ -45,16 +45,18 @@ class NetworkScanner:
                     f.write(content)
                 print("OUI database downloaded and cached")
             
-            # Parse the OUI file
-            for line in content.splitlines():
-                if '(hex)' in line:
-                    parts = line.split('\t')
-                    if len(parts) >= 3:
-                        # Extract OUI (first 6 hex digits)
-                        oui_hex = parts[0].strip().replace('-', ':').lower()
-                        # Extract company name
-                        company = parts[2].strip()
-                        vendor_db[oui_hex] = company
+                # Parse the OUI file
+                for line in content.splitlines():
+                    if '(hex)' in line:
+                        # Split on tab, but handle multiple tabs
+                        parts = [part.strip() for part in line.split('\t') if part.strip()]
+                        if len(parts) >= 2:
+                            # Extract OUI (first part, remove (hex))
+                            oui_part = parts[0].replace('(hex)', '').strip()
+                            oui_hex = oui_part.replace('-', ':').lower()
+                            # Extract company name (last non-empty part)
+                            company = parts[-1].strip()
+                            vendor_db[oui_hex] = company
             
             print(f"Loaded {len(vendor_db)} vendor entries from IEEE OUI database")
             
