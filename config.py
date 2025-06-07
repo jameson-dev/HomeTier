@@ -11,7 +11,7 @@ class Config:
     
     # Network scanning
     SCAN_INTERVAL = int(os.getenv('SCAN_INTERVAL', 300))  # 5 minutes
-    NETWORK_RANGE = os.getenv('NETWORK_RANGE', '192.168.1.0/24')
+    NETWORK_RANGE = os.getenv('NETWORK_RANGE', '192.168.0.0/24')
     
     # Data directory
     DATA_DIR = Path('data')

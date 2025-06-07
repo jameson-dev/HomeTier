@@ -4,7 +4,7 @@ import socket
 import subprocess
 import re
 from datetime import datetime
-from backend.database import add_device
+from backend.database import add_device, get_db_connection
 from config import Config
 import threading
 import time
@@ -87,6 +87,14 @@ class NetworkScanner:
         
         return vendor_db
     
+    def detect_wsl2(self):
+        """Detect if running in WSL2 environment"""
+        try:
+            with open('/proc/version', 'r') as f:
+                return 'microsoft' in f.read().lower()
+        except:
+            return False
+    
     def get_network_range(self):
         """Auto-detect local network range"""
         try:
@@ -114,6 +122,50 @@ class NetworkScanner:
         # Get first 3 octets
         mac_prefix = ':'.join(mac_address.split(':')[:3]).lower()
         return self.vendor_db.get(mac_prefix, 'Unknown')
+    
+    def get_mac_for_ip(self, ip):
+        """Try to get MAC address for IP"""
+        # Try ping then check ARP table
+        try:
+            subprocess.run(['ping', '-c', '1', '-W', '1', ip], 
+                          capture_output=True, timeout=3)
+            result = subprocess.run(['arp', '-n'], capture_output=True, text=True)
+            for line in result.stdout.splitlines():
+                if ip in line:
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        mac = parts[2] if len(parts[2]) == 17 else parts[1]
+                        if ':' in mac and len(mac) == 17:
+                            return mac
+        except:
+            pass
+        
+        return None
+    
+    def wsl2_ping_scan(self, network_range):
+        """Use nmap for WSL2 since ARP table is isolated"""
+        try:
+            print(f"WSL2 detected - using nmap scan for {network_range}")
+            self.nm.scan(hosts=network_range, arguments='-sn --host-timeout 2s')
+            
+            devices = []
+            for host in self.nm.all_hosts():
+                if self.nm[host].state() == 'up':
+                    device = {
+                        'ip': host,
+                        'mac': self.get_mac_for_ip(host),
+                        'hostname': self.get_hostname(host),
+                        'vendor': None
+                    }
+                    if device['mac']:
+                        device['vendor'] = self.get_vendor_from_mac(device['mac'])
+                        devices.append(device)
+                        
+            return devices
+            
+        except Exception as e:
+            print(f"WSL2 scan failed: {e}")
+            return []
     
     def ping_scan(self, network_range=None):
         """Perform ping scan to discover active hosts"""
@@ -184,11 +236,16 @@ class NetworkScanner:
             return None
     
     def scan_network(self):
-        """Main network scanning function"""
+        """Main network scanning function with WSL2 support"""
         print(f"Starting network scan at {datetime.now()}")
         
-        # Perform scan
-        devices = self.ping_scan()
+        network_range = self.get_network_range()
+        
+        # Check if we're in WSL2 and use appropriate scanning method
+        if self.detect_wsl2():
+            devices = self.wsl2_ping_scan(network_range)
+        else:
+            devices = self.ping_scan(network_range)
         
         # Process discovered devices
         processed_devices = []

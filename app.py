@@ -6,7 +6,9 @@ import json
 import csv
 from datetime import datetime
 
-app = Flask(__name__)
+app = Flask(__name__, 
+           template_folder='frontend/templates',
+           static_folder='frontend/static')
 app.config.from_object(Config)
 
 # Initialize database
@@ -40,6 +42,63 @@ def trigger_scan():
             'devices_found': len(devices),
             'devices': devices
         })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    
+@app.route('/api/inventory', methods=['GET'])
+def get_inventory():
+    conn = get_db_connection()
+    inventory = conn.execute('''
+        SELECT i.*, d.ip_address, d.mac_address 
+        FROM inventory i
+        LEFT JOIN devices d ON i.device_id = d.id
+        ORDER BY i.created_at DESC
+    ''').fetchall()
+    conn.close()
+    
+    return jsonify([dict(item) for item in inventory])
+
+@app.route('/api/inventory', methods=['POST'])
+def add_inventory():
+    try:
+        data = request.form
+        conn = get_db_connection()
+        
+        cursor = conn.execute('''
+            INSERT INTO inventory (name, category, brand, model, purchase_date, 
+                                 warranty_expiry, store_vendor, price, serial_number, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('name'),
+            data.get('category'),
+            data.get('brand'),
+            data.get('model'),
+            data.get('purchase_date') or None,
+            data.get('warranty_expiry') or None,
+            data.get('store_vendor'),
+            data.get('price') or None,
+            data.get('serial_number'),
+            data.get('notes')
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'status': 'success', 'id': cursor.lastrowid})
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/devices/<int:device_id>/ignore', methods=['POST'])
+def ignore_device(device_id):
+    try:
+        conn = get_db_connection()
+        conn.execute('UPDATE devices SET is_ignored = 1 WHERE id = ?', (device_id,))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'status': 'success'})
+        
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
