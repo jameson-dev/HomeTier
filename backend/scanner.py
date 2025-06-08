@@ -22,21 +22,14 @@ class NetworkScanner:
         
         vendor_db = {}
         oui_file = Path('data/oui.txt')
-        content = ""  # Initialize content variable
+        content = ""
         
         try:
-            print(f"DEBUG: File exists: {oui_file.exists()}")
-            if oui_file.exists():
-                file_age = time.time() - oui_file.stat().st_mtime
-                cache_valid = file_age < (30 * 24 * 3600)
-                print(f"DEBUG: File age: {file_age/3600:.1f} hours, Cache valid: {cache_valid}")
-            
             # Check if we have a cached OUI file less than 30 days old
             if oui_file.exists() and (time.time() - oui_file.stat().st_mtime) < (30 * 24 * 3600):
                 print("Loading cached OUI database...")
                 with open(oui_file, 'r', encoding='utf-8', errors='ignore') as f:
                     content = f.read()
-                print(f"DEBUG: Read {len(content)} characters from cache")
             else:
                 print("Downloading IEEE OUI database...")
                 # Download the latest OUI database
@@ -58,32 +51,33 @@ class NetworkScanner:
                     f.write(content)
                 print("OUI database downloaded and cached")
             
-                print("DEBUG: Starting to parse content...")
-                print(f"DEBUG: Content length before parsing: {len(content)}")
-        
-                if not content:  # Add this check
-                    print("DEBUG: Content is empty!")
-                    return vendor_db
-        
-                lines_processed = 0
-                hex_lines = 0
-                
-                # Parse the OUI file
-                for line in content.splitlines():
-                    lines_processed += 1
-                    if '(hex)' in line:
-                        hex_lines += 1
-                        parts = line.split('\t')
-                        if len(parts) >= 3:
-                            oui_hex = parts[0].strip().replace('-', ':').lower()
-                            oui_hex = oui_hex.replace('(hex)', '').strip()
-                            company = parts[2].strip()
-                            if company:
-                                vendor_db[oui_hex] = company
-                
-                print(f"DEBUG: Processed {lines_processed} lines, {hex_lines} with (hex), {len(vendor_db)} entries added")
-                print(f"Loaded {len(vendor_db)} vendor entries from IEEE OUI database")
-                
+            # MOVE PARSING OUTSIDE THE IF/ELSE - this is the key fix!
+            print("DEBUG: Starting to parse content...")
+            print(f"DEBUG: Content length before parsing: {len(content)}")
+
+            if not content:
+                print("DEBUG: Content is empty!")
+                return vendor_db
+
+            lines_processed = 0
+            hex_lines = 0
+            
+            # Parse the OUI file
+            for line in content.splitlines():
+                lines_processed += 1
+                if '(hex)' in line:
+                    hex_lines += 1
+                    parts = line.split('\t')
+                    if len(parts) >= 3:
+                        oui_hex = parts[0].strip().replace('-', ':').lower()
+                        oui_hex = oui_hex.replace('(hex)', '').strip()
+                        company = parts[2].strip()
+                        if company:
+                            vendor_db[oui_hex] = company
+            
+            print(f"DEBUG: Processed {lines_processed} lines, {hex_lines} with (hex), {len(vendor_db)} entries added")
+            print(f"Loaded {len(vendor_db)} vendor entries from IEEE OUI database")
+                    
         except Exception as e:
             print(f"Error loading IEEE OUI database: {e}")
             import traceback
@@ -109,8 +103,14 @@ class NetworkScanner:
                 '00:17:fa': 'Honeywell',
                 '70:b3:d5': 'IEEE Registration Authority',
                 'ac:de:48': 'Private',
-                '02:00:00': 'Locally Administered'
+                '02:00:00': 'Locally Administered',
+                # Add your network's vendors to the fallback
+                '98:25:4a': 'TP-Link Systems Inc',
+                '84:1b:77': 'Intel Corporate',
+                'bc:33:29': 'Sony Interactive Entertainment Inc.',
+                'bc:51:fe': 'Swann communications Pty Ltd'
             }
+        
         print(f"DEBUG: Returning {len(vendor_db)} entries")
         return vendor_db
     
