@@ -3,7 +3,6 @@ import nmap
 import socket
 import subprocess
 import re
-import time
 from datetime import datetime
 from backend.database import add_device, get_db_connection
 from config import Config
