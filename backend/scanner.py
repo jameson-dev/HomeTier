@@ -3,6 +3,7 @@ import nmap
 import socket
 import subprocess
 import re
+import time
 from datetime import datetime
 from backend.database import add_device, get_db_connection
 from config import Config
@@ -17,7 +18,6 @@ class NetworkScanner:
     def _load_vendor_db(self):
         """Load MAC vendor database from IEEE OUI"""
         import requests
-        import time
         import os
         from pathlib import Path
         
