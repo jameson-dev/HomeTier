@@ -17,6 +17,7 @@ class NetworkScanner:
     def _load_vendor_db(self):
         """Load MAC vendor database from IEEE OUI"""
         import requests
+        import time
         import os
         from pathlib import Path
         
