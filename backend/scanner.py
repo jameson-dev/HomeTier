@@ -22,6 +22,7 @@ class NetworkScanner:
         
         vendor_db = {}
         oui_file = Path('data/oui.txt')
+        content = ""  # Initialize content variable
         
         try:
             print(f"DEBUG: File exists: {oui_file.exists()}")
@@ -58,6 +59,12 @@ class NetworkScanner:
                 print("OUI database downloaded and cached")
             
                 print("DEBUG: Starting to parse content...")
+                print(f"DEBUG: Content length before parsing: {len(content)}")
+        
+                if not content:  # Add this check
+                    print("DEBUG: Content is empty!")
+                    return vendor_db
+        
                 lines_processed = 0
                 hex_lines = 0
                 
