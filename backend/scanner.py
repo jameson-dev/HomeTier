@@ -60,7 +60,7 @@ class NetworkScanner:
                 print("DEBUG: Starting to parse content...")
                 lines_processed = 0
                 hex_lines = 0
-            
+                
                 # Parse the OUI file
                 for line in content.splitlines():
                     lines_processed += 1
@@ -73,13 +73,14 @@ class NetworkScanner:
                             company = parts[2].strip()
                             if company:
                                 vendor_db[oui_hex] = company
-                                
-            print(f"DEBUG: Processed {lines_processed} lines, {hex_lines} with (hex), {len(vendor_db)} entries added")
-            print(f"Loaded {len(vendor_db)} vendor entries from IEEE OUI database")
-            
+                
+                print(f"DEBUG: Processed {lines_processed} lines, {hex_lines} with (hex), {len(vendor_db)} entries added")
+                print(f"Loaded {len(vendor_db)} vendor entries from IEEE OUI database")
+                
         except Exception as e:
             print(f"Error loading IEEE OUI database: {e}")
-            print("Falling back to basic vendor database...")
+            import traceback
+            traceback.print_exc()
             # Fallback to basic database if download fails
             vendor_db = {
                 '00:50:56': 'VMware',
