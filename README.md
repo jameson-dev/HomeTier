@@ -18,7 +18,7 @@ A locally-hosted web application that helps you maintain an organized inventory 
 1. **Clone the repository**
    ```bash
    git clone https://github.com/jameson-dev/hometier.git
-   cd network-inventory-manager
+   cd hometier
    ```
 
 2. **Run with Docker Compose**
