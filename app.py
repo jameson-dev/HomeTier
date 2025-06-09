@@ -52,6 +52,7 @@ def get_inventory():
         SELECT i.*, d.ip_address, d.mac_address 
         FROM inventory i
         LEFT JOIN devices d ON i.device_id = d.id
+        WHERE i.deleted_at IS NULL
         ORDER BY i.created_at DESC
     ''').fetchall()
     conn.close()
@@ -85,6 +86,34 @@ def add_inventory():
         conn.close()
         
         return jsonify({'status': 'success', 'id': cursor.lastrowid})
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/inventory/<int:inventory_id>', methods=['DELETE'])
+def delete_inventory_item(inventory_id):
+    try:
+        conn = get_db_connection()
+        
+        # Check if item exists and is not already deleted
+        item = conn.execute(
+            'SELECT * FROM inventory WHERE id = ? AND deleted_at IS NULL', 
+            (inventory_id,)
+        ).fetchone()
+        
+        if not item:
+            conn.close()
+            return jsonify({'status': 'error', 'message': 'Item not found or already deleted'}), 404
+        
+        # Soft delete - mark as deleted instead of removing
+        conn.execute(
+            'UPDATE inventory SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?', 
+            (inventory_id,)
+        )
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'status': 'success', 'message': 'Item deleted successfully'})
         
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500

@@ -318,9 +318,10 @@ function updateInventoryTable(inventory) {
                 <button class="btn btn-sm btn-outline-primary me-1" onclick="editInventoryItem(${item.id})">
                     <i class="fas fa-edit"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteInventoryItem(${item.id})">
-                    <i class="fas fa-trash"></i>
-                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteInventoryItem(${item.id})" 
+                    title="Delete this item">
+                <i class="fas fa-trash"></i> Delete
+            </button>
             </td>
         </tr>
     `).join('');
@@ -393,6 +394,27 @@ function editInventoryItem(id) {
     showNotification('Edit functionality coming soon', 'info');
 }
 
-function deleteInventoryItem(id) {
-    showNotification('Delete functionality coming soon', 'info');
+async function deleteInventoryItem(id) {
+    if (!confirm('Are you sure you want to delete this inventory item? This action cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/inventory/${id}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            showNotification('Inventory item deleted successfully', 'success');
+            await loadInventoryData(); // Refresh the inventory table
+        } else {
+            showNotification(`Error: ${result.message}`, 'danger');
+        }
+        
+    } catch (error) {
+        console.error('Error deleting inventory item:', error);
+        showNotification('Error deleting inventory item', 'danger');
+    }
 }

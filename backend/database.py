@@ -47,11 +47,19 @@ def init_db():
             notes TEXT,
             photo_path TEXT,
             receipt_path TEXT,
+            deleted_at TIMESTAMP DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (device_id) REFERENCES devices (id)
         )
     ''')
+    
+    try:
+        conn.execute('ALTER TABLE inventory ADD COLUMN deleted_at TIMESTAMP DEFAULT NULL')
+        print("Migration: Added deleted_at column to inventory table")
+    except Exception as e:
+        # Column already exists or table doesn't exist yet - ignore error
+        pass
     
     # Device relationships table
     conn.execute('''
