@@ -8,6 +8,7 @@ class Config:
     # Flask
     SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-change-this')
     DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
+    PORT = int(os.getenv('PORT', 5000))
     
     # Network scanning
     SCAN_INTERVAL = int(os.getenv('SCAN_INTERVAL', 300))  # 5 minutes
