@@ -386,8 +386,40 @@ function applyFilters() {
     showNotification('Filters applied', 'info');
 }
 
-function exportInventory(format) {
-    showNotification(`Exporting inventory as ${format.toUpperCase()}...`, 'info');
+async function exportInventory(format) {
+    try {
+        showNotification(`Preparing ${format.toUpperCase()} export...`, 'info');
+        
+        const response = await fetch(`/api/inventory/export/${format}`);
+        
+        if (response.ok) {
+            // Get filename from response headers
+            const contentDisposition = response.headers.get('Content-Disposition');
+            const filename = contentDisposition 
+                ? contentDisposition.split('filename=')[1].replace(/"/g, '')
+                : `inventory_export.${format}`;
+            
+            // Create blob and download
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            showNotification(`${format.toUpperCase()} export completed successfully!`, 'success');
+        } else {
+            const error = await response.json();
+            showNotification(`Export failed: ${error.message}`, 'danger');
+        }
+        
+    } catch (error) {
+        console.error('Export error:', error);
+        showNotification(`Export failed: ${error.message}`, 'danger');
+    }
 }
 
 function editInventoryItem(id) {
