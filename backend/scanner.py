@@ -105,24 +105,38 @@ class NetworkScanner:
         except:
             return False
     
-    def get_network_range(self):
-        """Auto-detect local network range"""
+    def get_network_ranges(self):
+        """Get list of network ranges to scan (supports auto-detection and multiple ranges)"""
+        ranges = []
+        
+        # First try to auto-detect from default gateway
         try:
-            # Get default gateway
             result = subprocess.run(['ip', 'route', 'show', 'default'], 
-                                  capture_output=True, text=True)
+                                capture_output=True, text=True)
             if result.returncode == 0:
-                # Extract gateway IP
                 gateway_match = re.search(r'via (\d+\.\d+\.\d+\.\d+)', result.stdout)
                 if gateway_match:
                     gateway = gateway_match.group(1)
-                    # Assume /24 network
                     network_base = '.'.join(gateway.split('.')[:-1])
-                    return f"{network_base}.0/24"
+                    detected_range = f"{network_base}.0/24"
+                    print(f"Auto-detected network range: {detected_range}")
+                    return [detected_range]
         except Exception as e:
             print(f"Error detecting network range: {e}")
         
-        return Config.NETWORK_RANGE
+        # Fall back to configured range(s)
+        config_ranges = Config.NETWORK_RANGE
+        print(f"Using configured network range: {config_ranges}")
+        
+        if ',' in config_ranges:
+            # Multiple ranges: "192.168.0.0/24,192.168.1.0/24,192.168.2.0/24"
+            ranges = [range.strip() for range in config_ranges.split(',')]
+            print(f"Multiple network ranges configured: {ranges}")
+            return ranges
+        else:
+            # Single range
+            print(f"Single network range: {config_ranges}")
+            return [config_ranges]
     
     def get_vendor_from_mac(self, mac_address):
         """Get vendor from MAC address"""
@@ -292,33 +306,36 @@ class NetworkScanner:
         return None
     
     def scan_network(self):
-        """Main network scanning function"""
+        """Main network scanning function with multi-range support"""
         print(f"Starting network scan at {datetime.now()}")
         
-        network_range = self.get_network_range()
+        network_ranges = self.get_network_ranges()
+        all_devices = []
         
-        # Try multiple methods for Ubuntu
-        devices = self.ping_scan(network_range)
+        for network_range in network_ranges:
+            print(f"Scanning range: {network_range}")
+            
+            if self.detect_wsl2():
+                devices = self.wsl2_ping_scan(network_range)
+            else:
+                devices = self.ping_scan(network_range)
+            
+            all_devices.extend(devices)
         
-        if not devices:
-            print("Trying netlink method...")
-            devices = self.netlink_scan(network_range)
-        
-        # Process discovered devices
+        # Process all discovered devices
         processed_devices = []
-        for device in devices:
-            if device['mac']:  # Only process devices with MAC addresses
+        for device in all_devices:
+            if device['mac']:
                 device_id = add_device(
                     mac_address=device['mac'],
                     ip_address=device['ip'],
                     hostname=device['hostname'],
                     vendor=device['vendor']
                 )
-                
                 device['id'] = device_id
                 processed_devices.append(device)
-                
-        print(f"Scan completed. Found {len(processed_devices)} devices with MAC addresses")
+    
+        print(f"Scan completed. Found {len(processed_devices)} devices across {len(network_ranges)} networks")
         return processed_devices
     
     def start_periodic_scan(self, interval=None):
