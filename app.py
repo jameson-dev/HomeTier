@@ -233,5 +233,9 @@ def ignore_device(device_id):
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/scanner')
+def scanner():
+    return render_template('scanner.html')
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=app.config['PORT'], debug=app.config['DEBUG'])

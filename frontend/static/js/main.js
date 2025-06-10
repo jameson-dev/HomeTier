@@ -72,48 +72,6 @@ async function loadDashboardData() {
     }
 }
 
-async function loadRecentDevices() {
-    try {
-        const response = await fetch('/api/devices');
-        const devices = await response.json();
-        currentDevices = devices;
-
-        const tbody = document.getElementById('devices-table');
-        if (devices.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="text-center text-muted">
-                        No devices found. Click "Start Scan" to discover devices.
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-
-        tbody.innerHTML = devices.slice(0, 10).map(device => `
-            <tr>
-                <td>${device.ip_address || 'N/A'}</td>
-                <td><code>${device.mac_address}</code></td>
-                <td>${device.hostname && device.hostname !== 'Unknown' ? device.hostname : ''}</td>
-                <td>${device.vendor || 'Unknown'}</td>
-                <td>${formatDateTime(device.first_seen)}</td>
-                <td>
-                    <button class="btn btn-sm btn-success me-1" onclick="addToInventory(${device.id})">
-                        <i class="fas fa-plus"></i> Add
-                    </button>
-                    <button class="btn btn-sm btn-secondary" onclick="ignoreDevice(${device.id})">
-                        <i class="fas fa-eye-slash"></i> Ignore
-                    </button>
-                </td>
-            </tr>
-        `).join('');
-
-    } catch (error) {
-        console.error('Error loading devices:', error);
-        showNotification('Error loading devices', 'danger');
-    }
-}
-
 async function startNetworkScan() {
     if (scanInProgress) return;
 
