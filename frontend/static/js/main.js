@@ -507,15 +507,6 @@ async function unignoreDevice(deviceId) {
     }
 }
 
-function refreshDevices() {
-    if (window.location.pathname.includes('scanning')) {
-        loadScanningData();
-        loadRecentDevices();
-    } else {
-        loadRecentDevices();
-    }
-}
-
 // Event listeners
 document.addEventListener('DOMContentLoaded', function () {
     // Bind scan button
