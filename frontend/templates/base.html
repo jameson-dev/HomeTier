@@ -26,10 +26,22 @@
                             <i class="fas fa-home me-1"></i>Dashboard
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('inventory') }}">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="inventoryDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-boxes me-1"></i>Inventory
                         </a>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('inventory') }}">
+                                    <i class="fas fa-list me-2"></i>Manage Inventory
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('scanning') }}">
+                                    <i class="fas fa-search me-2"></i>Network Scanning
+                                </a>
+                            </li>
+                        </ul>
                     </li>
                 </ul>
             </div>

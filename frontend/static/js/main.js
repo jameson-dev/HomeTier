@@ -4,6 +4,7 @@
 let currentDevices = [];
 let currentInventory = [];
 let scanInProgress = false;
+let currentFilter = 'all';
 
 // Utility functions
 function formatDate(dateString) {
@@ -38,8 +39,13 @@ function showNotification(message, type = 'info') {
 // Dashboard functions
 async function loadDashboardData() {
     try {
-        const response = await fetch('/api/devices');
-        const devices = await response.json();
+        const [devicesResponse, inventoryResponse] = await Promise.all([
+            fetch('/api/devices'),
+            fetch('/api/inventory')
+        ]);
+        
+        const devices = await devicesResponse.json();
+        const inventory = await inventoryResponse.json();
 
         const activeDevices = devices.filter(d =>
             new Date() - new Date(d.last_seen) < 3600000 // Last hour
@@ -56,6 +62,9 @@ async function loadDashboardData() {
         const newCount = document.getElementById('new-devices-count');
         if (newCount) newCount.textContent = newDevices;
 
+        const inventoryCount = document.getElementById('inventory-count');
+        if (inventoryCount) inventoryCount.textContent = inventory.length;
+
         // Update last scan time
         if (devices.length > 0) {
             const lastScan = Math.max(...devices.map(d => new Date(d.last_seen)));
@@ -69,6 +78,111 @@ async function loadDashboardData() {
     } catch (error) {
         console.error('Error loading dashboard data:', error);
         showNotification('Error loading dashboard data', 'danger');
+    }
+}
+
+async function loadCategoryStats() {
+    try {
+        const response = await fetch('/api/dashboard/stats');
+        const stats = await response.json();
+        
+        const categoryStatsDiv = document.getElementById('category-stats');
+        if (!categoryStatsDiv) return;
+
+        if (stats.category_stats.length === 0) {
+            categoryStatsDiv.innerHTML = '<p class="text-muted">No inventory items yet</p>';
+            return;
+        }
+
+        categoryStatsDiv.innerHTML = stats.category_stats.map(item => `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span>${item.category || 'Uncategorized'}</span>
+                <span class="badge bg-primary">${item.count}</span>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        console.error('Error loading category stats:', error);
+        const categoryStatsDiv = document.getElementById('category-stats');
+        if (categoryStatsDiv) {
+            categoryStatsDiv.innerHTML = '<p class="text-danger">Error loading data</p>';
+        }
+    }
+}
+
+async function loadWarrantyAlerts() {
+    try {
+        const response = await fetch('/api/dashboard/stats');
+        const stats = await response.json();
+        
+        const warrantyAlertsDiv = document.getElementById('warranty-alerts');
+        if (!warrantyAlertsDiv) return;
+
+        if (stats.warranty_alerts.length === 0) {
+            warrantyAlertsDiv.innerHTML = '<p class="text-success"><i class="fas fa-check-circle me-2"></i>No warranty issues</p>';
+            return;
+        }
+
+        warrantyAlertsDiv.innerHTML = stats.warranty_alerts.map(item => {
+            const badgeClass = item.status === 'expired' ? 'bg-danger' : 'bg-warning';
+            const iconClass = item.status === 'expired' ? 'fa-times-circle' : 'fa-exclamation-triangle';
+            
+            return `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <strong>${item.name}</strong>
+                        <br><small class="text-muted">${formatDate(item.warranty_expiry)}</small>
+                    </div>
+                    <span class="badge ${badgeClass}">
+                        <i class="fas ${iconClass} me-1"></i>${item.status}
+                    </span>
+                </div>
+            `;
+        }).join('');
+
+    } catch (error) {
+        console.error('Error loading warranty alerts:', error);
+        const warrantyAlertsDiv = document.getElementById('warranty-alerts');
+        if (warrantyAlertsDiv) {
+            warrantyAlertsDiv.innerHTML = '<p class="text-danger">Error loading data</p>';
+        }
+    }
+}
+
+// Scanning page functions
+async function loadScanningData() {
+    try {
+        const [devicesResponse, statsResponse] = await Promise.all([
+            fetch('/api/devices'),
+            fetch('/api/scanning/stats')
+        ]);
+        
+        const devices = await devicesResponse.json();
+        const stats = await statsResponse.json();
+
+        // Update scan statistics
+        const totalCount = document.getElementById('total-devices-count');
+        if (totalCount) totalCount.textContent = stats.total_devices;
+
+        const managedCount = document.getElementById('managed-devices-count');
+        if (managedCount) managedCount.textContent = stats.managed_devices;
+
+        const unmanagedCount = document.getElementById('unmanaged-devices-count');
+        if (unmanagedCount) unmanagedCount.textContent = stats.unmanaged_devices;
+
+        const ignoredCount = document.getElementById('ignored-devices-count');
+        if (ignoredCount) ignoredCount.textContent = stats.ignored_devices;
+
+        // Update last scan time
+        if (devices.length > 0) {
+            const lastScan = Math.max(...devices.map(d => new Date(d.last_seen)));
+            const lastScanDisplay = document.getElementById('last-scan-display');
+            if (lastScanDisplay) lastScanDisplay.textContent = formatDateTime(lastScan);
+        }
+
+    } catch (error) {
+        console.error('Error loading scanning data:', error);
+        showNotification('Error loading scanning data', 'danger');
     }
 }
 
@@ -89,46 +203,134 @@ async function loadRecentDevices() {
         );
         
         const tbody = document.getElementById('devices-table');
+        if (!tbody) return;
+
         if (devices.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="text-center text-muted">
-                        No devices found. Click "Start Scan" to discover devices.
+                    <td colspan="8" class="text-center text-muted">
+                        No devices found. Click "Start Manual Scan" to discover devices.
                     </td>
                 </tr>
             `;
             return;
         }
         
-        tbody.innerHTML = devices.slice(0, 10).map(device => {
-            const isInInventory = inventoryDeviceIds.has(device.id);
-            const addButton = isInInventory 
-                ? `<span class="badge bg-success">In Inventory</span>`
-                : `<button class="btn btn-sm btn-success me-1" onclick="addToInventory(${device.id})">
-                     <i class="fas fa-plus"></i> Add
-                   </button>`;
-            
-            return `
-                <tr>
-                    <td>${device.ip_address || 'N/A'}</td>
-                    <td><code>${device.mac_address}</code></td>
-                    <td>${device.hostname && device.hostname !== 'Unknown' ? device.hostname : ''}</td>
-                    <td>${device.vendor || 'Unknown'}</td>
-                    <td>${formatDateTime(device.first_seen)}</td>
-                    <td>
-                        ${addButton}
-                        <button class="btn btn-sm btn-secondary" onclick="ignoreDevice(${device.id})">
-                            <i class="fas fa-eye-slash"></i> Ignore
-                        </button>
-                    </td>
-                </tr>
-            `;
-        }).join('');
+        // Apply current filter and render devices
+        filterDevices(currentFilter);
         
     } catch (error) {
         console.error('Error loading devices:', error);
         showNotification('Error loading devices', 'danger');
     }
+}
+
+function filterDevices(filter) {
+    currentFilter = filter;
+    
+    if (!currentDevices || currentDevices.length === 0) return;
+    
+    // Get inventory device IDs
+    const inventoryDeviceIds = new Set();
+    if (currentInventory) {
+        currentInventory.forEach(item => {
+            if (item.device_id) inventoryDeviceIds.add(item.device_id);
+        });
+    }
+    
+    let filteredDevices = currentDevices;
+    
+    switch (filter) {
+        case 'new':
+            filteredDevices = currentDevices.filter(device => 
+                new Date() - new Date(device.first_seen) < 24 * 3600000 && // Last 24 hours
+                !inventoryDeviceIds.has(device.id) && 
+                !device.is_ignored
+            );
+            break;
+        case 'managed':
+            filteredDevices = currentDevices.filter(device => 
+                inventoryDeviceIds.has(device.id)
+            );
+            break;
+        case 'ignored':
+            filteredDevices = currentDevices.filter(device => 
+                device.is_ignored
+            );
+            break;
+        default: // 'all'
+            break;
+    }
+    
+    renderDevicesTable(filteredDevices, inventoryDeviceIds);
+}
+
+function renderDevicesTable(devices, inventoryDeviceIds) {
+    const tbody = document.getElementById('devices-table');
+    if (!tbody) return;
+    
+    if (devices.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center text-muted">
+                    No devices found for the selected filter.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = devices.map(device => {
+        const isInInventory = inventoryDeviceIds.has(device.id);
+        const isIgnored = device.is_ignored;
+        const isNew = new Date() - new Date(device.first_seen) < 24 * 3600000;
+        
+        let statusBadge = '';
+        let actions = '';
+        
+        if (isIgnored) {
+            statusBadge = '<span class="badge bg-secondary">Ignored</span>';
+            actions = `
+                <button class="btn btn-sm btn-outline-success" onclick="unignoreDevice(${device.id})" title="Unignore device">
+                    <i class="fas fa-eye"></i>
+                </button>
+            `;
+        } else if (isInInventory) {
+            statusBadge = '<span class="badge bg-success">In Inventory</span>';
+            actions = `
+                <button class="btn btn-sm btn-outline-secondary" onclick="ignoreDevice(${device.id})" title="Ignore device">
+                    <i class="fas fa-eye-slash"></i>
+                </button>
+            `;
+        } else {
+            if (isNew) {
+                statusBadge = '<span class="badge bg-warning">New</span>';
+            } else {
+                statusBadge = '<span class="badge bg-light text-dark">Discovered</span>';
+            }
+            actions = `
+                <button class="btn btn-sm btn-success me-1" onclick="addToInventory(${device.id})" title="Add to inventory">
+                    <i class="fas fa-plus"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="ignoreDevice(${device.id})" title="Ignore device">
+                    <i class="fas fa-eye-slash"></i>
+                </button>
+            `;
+        }
+        
+        return `
+            <tr>
+                <td>${statusBadge}</td>
+                <td>${device.ip_address || 'N/A'}</td>
+                <td><code>${device.mac_address}</code></td>
+                <td>${device.hostname && device.hostname !== 'Unknown' ? device.hostname : '<span class="text-muted">Unknown</span>'}</td>
+                <td>${device.vendor || '<span class="text-muted">Unknown</span>'}</td>
+                <td>${formatDateTime(device.first_seen)}</td>
+                <td>${formatDateTime(device.last_seen)}</td>
+                <td>${actions}</td>
+            </tr>
+        `;
+    }).join('');
 }
 
 async function startNetworkScan() {
@@ -139,9 +341,13 @@ async function startNetworkScan() {
     const scanProgress = document.getElementById('scan-progress');
 
     // Update UI
-    scanBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Scanning...';
-    scanBtn.disabled = true;
-    scanProgress.style.display = 'block';
+    if (scanBtn) {
+        scanBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Scanning...';
+        scanBtn.disabled = true;
+    }
+    if (scanProgress) {
+        scanProgress.style.display = 'block';
+    }
 
     try {
         const response = await fetch('/api/scan', {
@@ -159,9 +365,13 @@ async function startNetworkScan() {
                 'success'
             );
 
-            // Refresh dashboard and device list
-            await loadDashboardData();
-            await loadRecentDevices();
+            // Refresh data based on current page
+            if (window.location.pathname.includes('scanning')) {
+                await loadScanningData();
+                await loadRecentDevices();
+            } else {
+                await loadDashboardData();
+            }
         } else {
             showNotification(`Scan failed: ${result.message}`, 'danger');
         }
@@ -172,9 +382,13 @@ async function startNetworkScan() {
     } finally {
         // Reset UI
         scanInProgress = false;
-        scanBtn.innerHTML = '<i class="fas fa-search me-2"></i>Start Scan';
-        scanBtn.disabled = false;
-        scanProgress.style.display = 'none';
+        if (scanBtn) {
+            scanBtn.innerHTML = '<i class="fas fa-search me-2"></i>Start Manual Scan';
+            scanBtn.disabled = false;
+        }
+        if (scanProgress) {
+            scanProgress.style.display = 'none';
+        }
     }
 }
 
@@ -189,7 +403,7 @@ function addToInventory(deviceId) {
 
     // Pre-select category based on vendor
     const category = document.getElementById('category');
-    if (device.vendor) {
+    if (device.vendor && category) {
         const vendor = device.vendor.toLowerCase();
         if (vendor.includes('cisco') || vendor.includes('netgear') || vendor.includes('linksys')) {
             category.value = 'Router';
@@ -224,8 +438,15 @@ async function saveToInventory() {
             const modal = bootstrap.Modal.getInstance(document.getElementById('addToInventoryModal'));
             modal.hide();
 
-            await loadDashboardData();
-            await loadRecentDevices();
+            // Refresh appropriate data based on current page
+            if (window.location.pathname.includes('scanning')) {
+                await loadScanningData();
+                await loadRecentDevices();
+            } else if (window.location.pathname.includes('inventory')) {
+                await loadInventoryData();
+            } else {
+                await loadDashboardData();
+            }
         } else {
             showNotification(`Error: ${result.message}`, 'danger');
         }
@@ -248,7 +469,14 @@ async function ignoreDevice(deviceId) {
 
         if (result.status === 'success') {
             showNotification('Device ignored successfully', 'info');
-            await loadRecentDevices();
+            
+            // Refresh data based on current page
+            if (window.location.pathname.includes('scanning')) {
+                await loadScanningData();
+                await loadRecentDevices();
+            } else {
+                await loadRecentDevices();
+            }
         } else {
             showNotification(`Error: ${result.message}`, 'danger');
         }
@@ -259,8 +487,24 @@ async function ignoreDevice(deviceId) {
     }
 }
 
+async function unignoreDevice(deviceId) {
+    try {
+        // Add unignore endpoint call here when implemented
+        showNotification('Unignore functionality coming soon', 'info');
+        
+    } catch (error) {
+        console.error('Error unignoring device:', error);
+        showNotification('Error unignoring device', 'danger');
+    }
+}
+
 function refreshDevices() {
-    loadRecentDevices();
+    if (window.location.pathname.includes('scanning')) {
+        loadScanningData();
+        loadRecentDevices();
+    } else {
+        loadRecentDevices();
+    }
 }
 
 // Event listeners
@@ -275,7 +519,11 @@ document.addEventListener('DOMContentLoaded', function () {
 // Auto-refresh every 30 seconds
 setInterval(() => {
     if (!scanInProgress) {
-        loadDashboardData();
+        if (window.location.pathname.includes('scanning')) {
+            loadScanningData();
+        } else {
+            loadDashboardData();
+        }
     }
 }, 30000);
 
@@ -297,6 +545,7 @@ async function loadInventoryData() {
 
 function updateInventoryTable(inventory) {
     const tbody = document.getElementById('inventory-table');
+    if (!tbody) return;
 
     if (inventory.length === 0) {
         tbody.innerHTML = `

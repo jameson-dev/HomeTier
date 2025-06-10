@@ -24,6 +24,10 @@ def index():
 def inventory():
     return render_template('inventory.html')
 
+@app.route('/scanning')
+def scanning():
+    return render_template('scanning.html')
+
 @app.route('/api/devices', methods=['GET'])
 def get_devices():
     conn = get_db_connection()
@@ -31,6 +35,46 @@ def get_devices():
     conn.close()
     
     return jsonify([dict(device) for device in devices])
+
+@app.route('/api/dashboard/stats', methods=['GET'])
+def get_dashboard_stats():
+    """Get dashboard statistics including category breakdown and warranty alerts"""
+    try:
+        conn = get_db_connection()
+        
+        # Category statistics
+        category_stats = conn.execute('''
+            SELECT category, COUNT(*) as count
+            FROM inventory 
+            WHERE deleted_at IS NULL 
+            GROUP BY category
+            ORDER BY count DESC
+        ''').fetchall()
+        
+        # Warranty alerts (expiring in 30 days or expired)
+        warranty_alerts = conn.execute('''
+            SELECT name, warranty_expiry,
+                   CASE 
+                       WHEN warranty_expiry < date('now') THEN 'expired'
+                       WHEN warranty_expiry <= date('now', '+30 days') THEN 'expiring'
+                       ELSE 'active'
+                   END as status
+            FROM inventory 
+            WHERE deleted_at IS NULL 
+            AND warranty_expiry IS NOT NULL
+            AND warranty_expiry <= date('now', '+30 days')
+            ORDER BY warranty_expiry ASC
+        ''').fetchall()
+        
+        conn.close()
+        
+        return jsonify({
+            'category_stats': [dict(row) for row in category_stats],
+            'warranty_alerts': [dict(row) for row in warranty_alerts]
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/scan', methods=['POST'])
 def trigger_scan():
@@ -41,6 +85,48 @@ def trigger_scan():
             'devices_found': len(devices),
             'devices': devices
         })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/scanning/stats', methods=['GET'])
+def get_scanning_stats():
+    """Get scanning-specific statistics"""
+    try:
+        conn = get_db_connection()
+        
+        # Total devices
+        total_devices = conn.execute('SELECT COUNT(*) as count FROM devices').fetchone()['count']
+        
+        # Devices in inventory
+        managed_devices = conn.execute('''
+            SELECT COUNT(*) as count FROM devices d
+            INNER JOIN inventory i ON d.id = i.device_id
+            WHERE i.deleted_at IS NULL
+        ''').fetchone()['count']
+        
+        # Devices not in inventory (excluding ignored)
+        unmanaged_devices = conn.execute('''
+            SELECT COUNT(*) as count FROM devices d
+            LEFT JOIN inventory i ON d.id = i.device_id
+            WHERE (i.device_id IS NULL OR i.deleted_at IS NOT NULL)
+            AND d.is_ignored = 0
+        ''').fetchone()['count']
+        
+        # Ignored devices
+        ignored_devices = conn.execute('''
+            SELECT COUNT(*) as count FROM devices 
+            WHERE is_ignored = 1
+        ''').fetchone()['count']
+        
+        conn.close()
+        
+        return jsonify({
+            'total_devices': total_devices,
+            'managed_devices': managed_devices,
+            'unmanaged_devices': unmanaged_devices,
+            'ignored_devices': ignored_devices
+        })
+        
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
     
