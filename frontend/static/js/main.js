@@ -196,6 +196,7 @@ async function loadRecentDevices() {
         const devices = await devicesResponse.json();
         const inventory = await inventoryResponse.json();
         currentDevices = devices;
+        currentInventory = inventory; // Make sure we update the global inventory state
         
         // Create set of device IDs already in inventory
         const inventoryDeviceIds = new Set(
@@ -230,9 +231,9 @@ function filterDevices(filter) {
     
     if (!currentDevices || currentDevices.length === 0) return;
     
-    // Get inventory device IDs
+    // Get inventory device IDs from the current inventory state
     const inventoryDeviceIds = new Set();
-    if (currentInventory) {
+    if (currentInventory && currentInventory.length > 0) {
         currentInventory.forEach(item => {
             if (item.device_id) inventoryDeviceIds.add(item.device_id);
         });
@@ -440,8 +441,14 @@ async function saveToInventory() {
 
             // Refresh appropriate data based on current page
             if (window.location.pathname.includes('scanning')) {
-                await loadScanningData();
-                await loadRecentDevices();
+                // For scanning page, we need to refresh both inventory and devices data
+                await Promise.all([
+                    loadScanningData(),
+                    fetch('/api/inventory').then(res => res.json()).then(inventory => {
+                        currentInventory = inventory;
+                        return loadRecentDevices();
+                    })
+                ]);
             } else if (window.location.pathname.includes('inventory')) {
                 await loadInventoryData();
             } else {
@@ -472,8 +479,10 @@ async function ignoreDevice(deviceId) {
             
             // Refresh data based on current page
             if (window.location.pathname.includes('scanning')) {
-                await loadScanningData();
-                await loadRecentDevices();
+                await Promise.all([
+                    loadScanningData(),
+                    loadRecentDevices()
+                ]);
             } else {
                 await loadRecentDevices();
             }
