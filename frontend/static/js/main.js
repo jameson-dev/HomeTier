@@ -5,6 +5,7 @@ let currentDevices = [];
 let currentInventory = [];
 let scanInProgress = false;
 let currentFilter = 'all';
+let selectedDevices = new Set();
 
 // Utility functions
 function formatDate(dateString) {
@@ -209,7 +210,7 @@ async function loadRecentDevices() {
         if (devices.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="8" class="text-center text-muted">
+                    <td colspan="9" class="text-center text-muted">
                         No devices found. Click "Start Manual Scan" to discover devices.
                     </td>
                 </tr>
@@ -228,6 +229,7 @@ async function loadRecentDevices() {
 
 function filterDevices(filter) {
     currentFilter = filter;
+    clearSelection(); // Clear selection when changing filters
     
     if (!currentDevices || currentDevices.length === 0) return;
     
@@ -273,7 +275,7 @@ function renderDevicesTable(devices, inventoryDeviceIds) {
     if (devices.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" class="text-center text-muted">
+                <td colspan="9" class="text-center text-muted">
                     No devices found for the selected filter.
                 </td>
             </tr>
@@ -285,9 +287,11 @@ function renderDevicesTable(devices, inventoryDeviceIds) {
         const isInInventory = inventoryDeviceIds.has(device.id);
         const isIgnored = device.is_ignored;
         const isNew = new Date() - new Date(device.first_seen) < 24 * 3600000;
+        const isSelected = selectedDevices.has(device.id);
         
         let statusBadge = '';
         let actions = '';
+        let selectableClass = '';
         
         if (isIgnored) {
             statusBadge = '<span class="badge bg-secondary">Ignored</span>';
@@ -296,6 +300,7 @@ function renderDevicesTable(devices, inventoryDeviceIds) {
                     <i class="fas fa-eye"></i> Unignore
                 </button>
             `;
+            selectableClass = 'selectable-ignored';
         } else if (isInInventory) {
             statusBadge = '<span class="badge bg-success">In Inventory</span>';
             actions = `
@@ -303,6 +308,7 @@ function renderDevicesTable(devices, inventoryDeviceIds) {
                     <i class="fas fa-eye-slash"></i>
                 </button>
             `;
+            selectableClass = 'selectable-managed';
         } else {
             if (isNew) {
                 statusBadge = '<span class="badge bg-warning">New</span>';
@@ -317,10 +323,17 @@ function renderDevicesTable(devices, inventoryDeviceIds) {
                     <i class="fas fa-eye-slash"></i>
                 </button>
             `;
+            selectableClass = 'selectable-unmanaged';
         }
         
         return `
-            <tr>
+            <tr class="${selectableClass}" data-device-id="${device.id}">
+                <td>
+                    <input type="checkbox" class="device-checkbox" 
+                           data-device-id="${device.id}" 
+                           ${isSelected ? 'checked' : ''}
+                           onchange="toggleDeviceSelection(${device.id}, this.checked)">
+                </td>
                 <td>${statusBadge}</td>
                 <td>${device.ip_address || 'N/A'}</td>
                 <td><code>${device.mac_address}</code></td>
@@ -332,6 +345,292 @@ function renderDevicesTable(devices, inventoryDeviceIds) {
             </tr>
         `;
     }).join('');
+    
+    // Update select all checkbox state
+    updateSelectAllCheckbox();
+}
+
+// Bulk selection functions
+function toggleDeviceSelection(deviceId, isSelected) {
+    if (isSelected) {
+        selectedDevices.add(deviceId);
+    } else {
+        selectedDevices.delete(deviceId);
+    }
+    updateBulkActionsBar();
+    updateSelectAllCheckbox();
+}
+
+function toggleSelectAll(checkbox) {
+    const deviceCheckboxes = document.querySelectorAll('.device-checkbox');
+    const visibleDeviceIds = Array.from(deviceCheckboxes).map(cb => parseInt(cb.dataset.deviceId));
+    
+    if (checkbox.checked) {
+        // Select all visible devices
+        visibleDeviceIds.forEach(id => selectedDevices.add(id));
+        deviceCheckboxes.forEach(cb => cb.checked = true);
+    } else {
+        // Deselect all visible devices
+        visibleDeviceIds.forEach(id => selectedDevices.delete(id));
+        deviceCheckboxes.forEach(cb => cb.checked = false);
+    }
+    updateBulkActionsBar();
+}
+
+function updateSelectAllCheckbox() {
+    const selectAllCheckbox = document.getElementById('select-all-checkbox');
+    const deviceCheckboxes = document.querySelectorAll('.device-checkbox');
+    
+    if (!selectAllCheckbox || deviceCheckboxes.length === 0) return;
+    
+    const checkedCount = Array.from(deviceCheckboxes).filter(cb => cb.checked).length;
+    
+    if (checkedCount === 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+    } else if (checkedCount === deviceCheckboxes.length) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+    } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+    }
+}
+
+function updateBulkActionsBar() {
+    const bulkActionsBar = document.getElementById('bulk-actions-bar');
+    const selectedCountSpan = document.getElementById('selected-count');
+    const bulkAddBtn = document.getElementById('bulk-add-btn');
+    const bulkIgnoreBtn = document.getElementById('bulk-ignore-btn');
+    const bulkUnignoreBtn = document.getElementById('bulk-unignore-btn');
+    
+    if (!bulkActionsBar) return;
+    
+    const selectedCount = selectedDevices.size;
+    
+    if (selectedCount === 0) {
+        bulkActionsBar.style.display = 'none';
+        return;
+    }
+    
+    bulkActionsBar.style.display = 'block';
+    selectedCountSpan.textContent = selectedCount;
+    
+    // Determine which actions are available based on selected devices
+    const selectedDeviceData = Array.from(selectedDevices).map(id => 
+        currentDevices.find(d => d.id === id)
+    ).filter(d => d);
+    
+    const inventoryDeviceIds = new Set(
+        currentInventory.map(item => item.device_id).filter(id => id !== null)
+    );
+    
+    const hasUnmanaged = selectedDeviceData.some(d => !inventoryDeviceIds.has(d.id) && !d.is_ignored);
+    const hasManaged = selectedDeviceData.some(d => inventoryDeviceIds.has(d.id));
+    const hasNonIgnored = selectedDeviceData.some(d => !d.is_ignored);
+    const hasIgnored = selectedDeviceData.some(d => d.is_ignored);
+    
+    // Show/hide buttons based on selection
+    bulkAddBtn.style.display = hasUnmanaged ? 'inline-block' : 'none';
+    bulkIgnoreBtn.style.display = hasNonIgnored ? 'inline-block' : 'none';
+    bulkUnignoreBtn.style.display = hasIgnored ? 'inline-block' : 'none';
+}
+
+function clearSelection() {
+    selectedDevices.clear();
+    document.querySelectorAll('.device-checkbox').forEach(cb => cb.checked = false);
+    updateBulkActionsBar();
+    updateSelectAllCheckbox();
+}
+
+// Bulk operation functions
+async function bulkAddToInventory() {
+    if (selectedDevices.size === 0) {
+        showNotification('No devices selected', 'warning');
+        return;
+    }
+    
+    // Filter only unmanaged devices
+    const inventoryDeviceIds = new Set(
+        currentInventory.map(item => item.device_id).filter(id => id !== null)
+    );
+    
+    const eligibleDeviceIds = Array.from(selectedDevices).filter(id => {
+        const device = currentDevices.find(d => d.id === id);
+        return device && !inventoryDeviceIds.has(id) && !device.is_ignored;
+    });
+    
+    if (eligibleDeviceIds.length === 0) {
+        showNotification('No eligible devices selected for adding to inventory', 'warning');
+        return;
+    }
+    
+    // Update modal with count and show it
+    document.getElementById('bulk-device-count').textContent = eligibleDeviceIds.length;
+    
+    // Store eligible device IDs for later use
+    window.bulkEligibleDeviceIds = eligibleDeviceIds;
+    
+    const modal = new bootstrap.Modal(document.getElementById('bulkAddToInventoryModal'));
+    modal.show();
+}
+
+async function saveBulkToInventory() {
+    const form = document.getElementById('bulkInventoryForm');
+    const formData = new FormData(form);
+    const useDeviceNames = document.getElementById('useDeviceNames').checked;
+    
+    const commonData = {
+        category: formData.get('category'),
+        brand: formData.get('brand'),
+        purchase_date: formData.get('purchase_date'),
+        notes: formData.get('notes')
+    };
+    
+    try {
+        const response = await fetch('/api/devices/bulk/add-to-inventory', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                device_ids: window.bulkEligibleDeviceIds,
+                common_data: commonData,
+                use_device_names: useDeviceNames
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            showNotification(result.message, 'success');
+
+            // Close modal and refresh data
+            const modal = bootstrap.Modal.getInstance(document.getElementById('bulkAddToInventoryModal'));
+            modal.hide();
+            form.reset();
+            
+            clearSelection();
+            
+            await Promise.all([
+                loadScanningData(),
+                fetch('/api/inventory').then(res => res.json()).then(inventory => {
+                    currentInventory = inventory;
+                    return loadRecentDevices();
+                })
+            ]);
+        } else {
+            showNotification(`Error: ${result.message}`, 'danger');
+        }
+
+    } catch (error) {
+        console.error('Error bulk adding to inventory:', error);
+        showNotification('Error adding devices to inventory', 'danger');
+    }
+}
+
+async function bulkIgnoreDevices() {
+    if (selectedDevices.size === 0) {
+        showNotification('No devices selected', 'warning');
+        return;
+    }
+    
+    // Filter only non-ignored devices
+    const eligibleDeviceIds = Array.from(selectedDevices).filter(id => {
+        const device = currentDevices.find(d => d.id === id);
+        return device && !device.is_ignored;
+    });
+    
+    if (eligibleDeviceIds.length === 0) {
+        showNotification('No eligible devices selected for ignoring', 'warning');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to ignore ${eligibleDeviceIds.length} device(s)?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/devices/bulk/ignore', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                device_ids: eligibleDeviceIds
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            showNotification(result.message, 'success');
+            clearSelection();
+            
+            await Promise.all([
+                loadScanningData(),
+                loadRecentDevices()
+            ]);
+        } else {
+            showNotification(`Error: ${result.message}`, 'danger');
+        }
+
+    } catch (error) {
+        console.error('Error bulk ignoring devices:', error);
+        showNotification('Error ignoring devices', 'danger');
+    }
+}
+
+async function bulkUnignoreDevices() {
+    if (selectedDevices.size === 0) {
+        showNotification('No devices selected', 'warning');
+        return;
+    }
+    
+    // Filter only ignored devices
+    const eligibleDeviceIds = Array.from(selectedDevices).filter(id => {
+        const device = currentDevices.find(d => d.id === id);
+        return device && device.is_ignored;
+    });
+    
+    if (eligibleDeviceIds.length === 0) {
+        showNotification('No ignored devices selected', 'warning');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to unignore ${eligibleDeviceIds.length} device(s)? They will appear in scans again.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/devices/bulk/unignore', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                device_ids: eligibleDeviceIds
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            showNotification(result.message, 'success');
+            clearSelection();
+            
+            await Promise.all([
+                loadScanningData(),
+                loadRecentDevices()
+            ]);
+        } else {
+            showNotification(`Error: ${result.message}`, 'danger');
+        }
+
+    } catch (error) {
+        console.error('Error bulk unignoring devices:', error);
+        showNotification('Error unignoring devices', 'danger');
+    }
 }
 
 async function startNetworkScan() {

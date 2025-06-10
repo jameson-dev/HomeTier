@@ -74,6 +74,29 @@ def get_dashboard_stats():
         })
         
     except Exception as e:
+@app.route('/api/devices/<int:device_id>/unignore', methods=['POST'])
+def unignore_device(device_id):
+    try:
+        conn = get_db_connection()
+        
+        # Check if device exists and is currently ignored
+        device = conn.execute(
+            'SELECT * FROM devices WHERE id = ? AND is_ignored = 1', 
+            (device_id,)
+        ).fetchone()
+        
+        if not device:
+            conn.close()
+            return jsonify({'status': 'error', 'message': 'Device not found or not currently ignored'}), 404
+        
+        # Unignore the device
+        conn.execute('UPDATE devices SET is_ignored = 0 WHERE id = ?', (device_id,))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'status': 'success', 'message': 'Device unignored successfully'})
+        
+    except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/scan', methods=['POST'])
@@ -339,27 +362,132 @@ def ignore_device(device_id):
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-@app.route('/api/devices/<int:device_id>/unignore', methods=['POST'])
-def unignore_device(device_id):
+@app.route('/api/devices/bulk/ignore', methods=['POST'])
+def bulk_ignore_devices():
     try:
+        data = request.get_json()
+        device_ids = data.get('device_ids', [])
+        
+        if not device_ids:
+            return jsonify({'status': 'error', 'message': 'No devices specified'}), 400
+        
         conn = get_db_connection()
         
-        # Check if device exists and is currently ignored
-        device = conn.execute(
-            'SELECT * FROM devices WHERE id = ? AND is_ignored = 1', 
-            (device_id,)
-        ).fetchone()
+        # Update all specified devices
+        placeholders = ','.join(['?' for _ in device_ids])
+        conn.execute(f'UPDATE devices SET is_ignored = 1 WHERE id IN ({placeholders})', device_ids)
         
-        if not device:
-            conn.close()
-            return jsonify({'status': 'error', 'message': 'Device not found or not currently ignored'}), 404
-        
-        # Unignore the device
-        conn.execute('UPDATE devices SET is_ignored = 0 WHERE id = ?', (device_id,))
+        affected_rows = conn.total_changes
         conn.commit()
         conn.close()
         
-        return jsonify({'status': 'success', 'message': 'Device unignored successfully'})
+        return jsonify({
+            'status': 'success', 
+            'message': f'Successfully ignored {affected_rows} device(s)',
+            'affected_count': affected_rows
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/devices/bulk/unignore', methods=['POST'])
+def bulk_unignore_devices():
+    try:
+        data = request.get_json()
+        device_ids = data.get('device_ids', [])
+        
+        if not device_ids:
+            return jsonify({'status': 'error', 'message': 'No devices specified'}), 400
+        
+        conn = get_db_connection()
+        
+        # Update all specified devices
+        placeholders = ','.join(['?' for _ in device_ids])
+        conn.execute(f'UPDATE devices SET is_ignored = 0 WHERE id IN ({placeholders})', device_ids)
+        
+        affected_rows = conn.total_changes
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'status': 'success', 
+            'message': f'Successfully unignored {affected_rows} device(s)',
+            'affected_count': affected_rows
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/devices/bulk/add-to-inventory', methods=['POST'])
+def bulk_add_to_inventory():
+    try:
+        data = request.get_json()
+        device_ids = data.get('device_ids', [])
+        common_data = data.get('common_data', {})
+        use_device_names = data.get('use_device_names', True)
+        
+        if not device_ids:
+            return jsonify({'status': 'error', 'message': 'No devices specified'}), 400
+        
+        conn = get_db_connection()
+        
+        # Get device information
+        placeholders = ','.join(['?' for _ in device_ids])
+        devices = conn.execute(f'''
+            SELECT id, ip_address, hostname, mac_address, vendor 
+            FROM devices 
+            WHERE id IN ({placeholders})
+        ''', device_ids).fetchall()
+        
+        # Check for devices already in inventory
+        existing = conn.execute(f'''
+            SELECT device_id FROM inventory 
+            WHERE device_id IN ({placeholders}) AND deleted_at IS NULL
+        ''', device_ids).fetchall()
+        
+        existing_ids = set(row['device_id'] for row in existing)
+        
+        added_count = 0
+        skipped_count = 0
+        
+        for device in devices:
+            if device['id'] in existing_ids:
+                skipped_count += 1
+                continue
+            
+            # Generate device name
+            if use_device_names and device['hostname'] and device['hostname'] != 'Unknown':
+                device_name = device['hostname']
+            else:
+                device_name = f"Device {device['ip_address']}"
+            
+            # Insert into inventory
+            conn.execute('''
+                INSERT INTO inventory (device_id, name, category, brand, purchase_date, notes)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                device['id'],
+                device_name,
+                common_data.get('category'),
+                common_data.get('brand'),
+                common_data.get('purchase_date') or None,
+                common_data.get('notes')
+            ))
+            added_count += 1
+        
+        conn.commit()
+        conn.close()
+        
+        message = f'Successfully added {added_count} device(s) to inventory'
+        if skipped_count > 0:
+            message += f' ({skipped_count} already in inventory)'
+        
+        return jsonify({
+            'status': 'success',
+            'message': message,
+            'added_count': added_count,
+            'skipped_count': skipped_count
+        })
         
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
