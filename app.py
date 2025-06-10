@@ -3,7 +3,6 @@ from backend.database import init_db, get_db_connection
 from backend.scanner import NetworkScanner
 from config import Config
 import json
-import csv
 from datetime import datetime
 
 app = Flask(__name__, 
@@ -117,6 +116,109 @@ def delete_inventory_item(inventory_id):
         
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/inventory/export/<format>', methods=['GET'])
+def export_inventory(format):
+    try:
+        conn = get_db_connection()
+        inventory = conn.execute('''
+            SELECT i.*, d.ip_address, d.mac_address, d.hostname
+            FROM inventory i
+            LEFT JOIN devices d ON i.device_id = d.id
+            WHERE i.deleted_at IS NULL
+            ORDER BY i.created_at DESC
+        ''').fetchall()
+        conn.close()
+        
+        if format.lower() == 'csv':
+            return export_to_csv(inventory)
+        elif format.lower() == 'json':
+            return export_to_json(inventory)
+        else:
+            return jsonify({'status': 'error', 'message': 'Invalid format'}), 400
+            
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+def export_to_csv(inventory):
+    import csv
+    import io
+    from flask import make_response
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write header
+    writer.writerow([
+        'ID', 'Name', 'Category', 'Brand', 'Model', 'Purchase Date', 
+        'Warranty Expiry', 'Store/Vendor', 'Price', 'Serial Number', 
+        'IP Address', 'MAC Address', 'Hostname', 'Notes', 'Created At'
+    ])
+    
+    # Write data
+    for item in inventory:
+        writer.writerow([
+            item['id'],
+            item['name'],
+            item['category'] or '',
+            item['brand'] or '',
+            item['model'] or '',
+            item['purchase_date'] or '',
+            item['warranty_expiry'] or '',
+            item['store_vendor'] or '',
+            item['price'] or '',
+            item['serial_number'] or '',
+            item['ip_address'] or '',
+            item['mac_address'] or '',
+            item['hostname'] or '',
+            item['notes'] or '',
+            item['created_at']
+        ])
+    
+    output.seek(0)
+    
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'text/csv'
+    response.headers['Content-Disposition'] = f'attachment; filename=inventory_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+    
+    return response
+
+def export_to_json(inventory):
+    from flask import make_response
+    
+    # Convert to list of dictionaries
+    data = []
+    for item in inventory:
+        data.append({
+            'id': item['id'],
+            'name': item['name'],
+            'category': item['category'],
+            'brand': item['brand'],
+            'model': item['model'],
+            'purchase_date': item['purchase_date'],
+            'warranty_expiry': item['warranty_expiry'],
+            'store_vendor': item['store_vendor'],
+            'price': item['price'],
+            'serial_number': item['serial_number'],
+            'ip_address': item['ip_address'],
+            'mac_address': item['mac_address'],
+            'hostname': item['hostname'],
+            'notes': item['notes'],
+            'created_at': item['created_at'],
+            'updated_at': item['updated_at']
+        })
+    
+    export_data = {
+        'export_date': datetime.now().isoformat(),
+        'total_items': len(data),
+        'inventory': data
+    }
+    
+    response = make_response(json.dumps(export_data, indent=2))
+    response.headers['Content-Type'] = 'application/json'
+    response.headers['Content-Disposition'] = f'attachment; filename=inventory_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+    
+    return response
 
 @app.route('/api/devices/<int:device_id>/ignore', methods=['POST'])
 def ignore_device(device_id):
