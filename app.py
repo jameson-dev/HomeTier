@@ -65,11 +65,26 @@ def add_inventory():
         data = request.form
         conn = get_db_connection()
         
+        # Check if device is already in inventory (only if device_id provided)
+        if data.get('device_id'):
+            existing = conn.execute('''
+                SELECT id FROM inventory 
+                WHERE device_id = ? AND deleted_at IS NULL
+            ''', (data.get('device_id'),)).fetchone()
+            
+            if existing:
+                conn.close()
+                return jsonify({
+                    'status': 'error', 
+                    'message': 'This device is already in your inventory'
+                }), 400
+        
         cursor = conn.execute('''
-            INSERT INTO inventory (name, category, brand, model, purchase_date, 
+            INSERT INTO inventory (device_id, name, category, brand, model, purchase_date, 
                                  warranty_expiry, store_vendor, price, serial_number, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
+            data.get('device_id') or None,
             data.get('name'),
             data.get('category'),
             data.get('brand'),
@@ -88,6 +103,11 @@ def add_inventory():
         return jsonify({'status': 'success', 'id': cursor.lastrowid})
         
     except Exception as e:
+        if 'UNIQUE constraint failed' in str(e):
+            return jsonify({
+                'status': 'error', 
+                'message': 'This device is already in your inventory'
+            }), 400
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/inventory/<int:inventory_id>', methods=['DELETE'])

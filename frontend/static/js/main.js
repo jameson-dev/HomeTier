@@ -74,10 +74,20 @@ async function loadDashboardData() {
 
 async function loadRecentDevices() {
     try {
-        const response = await fetch('/api/devices');
-        const devices = await response.json();
+        const [devicesResponse, inventoryResponse] = await Promise.all([
+            fetch('/api/devices'),
+            fetch('/api/inventory')
+        ]);
+        
+        const devices = await devicesResponse.json();
+        const inventory = await inventoryResponse.json();
         currentDevices = devices;
-
+        
+        // Create set of device IDs already in inventory
+        const inventoryDeviceIds = new Set(
+            inventory.map(item => item.device_id).filter(id => id !== null)
+        );
+        
         const tbody = document.getElementById('devices-table');
         if (devices.length === 0) {
             tbody.innerHTML = `
@@ -89,25 +99,32 @@ async function loadRecentDevices() {
             `;
             return;
         }
-
-        tbody.innerHTML = devices.slice(0, 10).map(device => `
-            <tr>
-                <td>${device.ip_address || 'N/A'}</td>
-                <td><code>${device.mac_address}</code></td>
-                <td>${device.hostname && device.hostname !== 'Unknown' ? device.hostname : ''}</td>
-                <td>${device.vendor || 'Unknown'}</td>
-                <td>${formatDateTime(device.first_seen)}</td>
-                <td>
-                    <button class="btn btn-sm btn-success me-1" onclick="addToInventory(${device.id})">
-                        <i class="fas fa-plus"></i> Add
-                    </button>
-                    <button class="btn btn-sm btn-secondary" onclick="ignoreDevice(${device.id})">
-                        <i class="fas fa-eye-slash"></i> Ignore
-                    </button>
-                </td>
-            </tr>
-        `).join('');
-
+        
+        tbody.innerHTML = devices.slice(0, 10).map(device => {
+            const isInInventory = inventoryDeviceIds.has(device.id);
+            const addButton = isInInventory 
+                ? `<span class="badge bg-success">In Inventory</span>`
+                : `<button class="btn btn-sm btn-success me-1" onclick="addToInventory(${device.id})">
+                     <i class="fas fa-plus"></i> Add
+                   </button>`;
+            
+            return `
+                <tr>
+                    <td>${device.ip_address || 'N/A'}</td>
+                    <td><code>${device.mac_address}</code></td>
+                    <td>${device.hostname && device.hostname !== 'Unknown' ? device.hostname : ''}</td>
+                    <td>${device.vendor || 'Unknown'}</td>
+                    <td>${formatDateTime(device.first_seen)}</td>
+                    <td>
+                        ${addButton}
+                        <button class="btn btn-sm btn-secondary" onclick="ignoreDevice(${device.id})">
+                            <i class="fas fa-eye-slash"></i> Ignore
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
     } catch (error) {
         console.error('Error loading devices:', error);
         showNotification('Error loading devices', 'danger');

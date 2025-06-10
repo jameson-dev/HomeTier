@@ -34,7 +34,7 @@ def init_db():
     conn.execute('''
         CREATE TABLE IF NOT EXISTS inventory (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            device_id INTEGER,
+            device_id INTEGER UNIQUE,
             name TEXT NOT NULL,
             category TEXT,
             brand TEXT,
