@@ -201,7 +201,7 @@
 
 <!-- Bulk Add to Inventory Modal -->
 <div class="modal fade" id="bulkAddToInventoryModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Add Multiple Devices to Inventory</h5>
@@ -211,51 +211,76 @@
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle me-2"></i>
                     You are adding <strong id="bulk-device-count">0</strong> device(s) to inventory.
-                    These settings will be applied to all selected devices.
                 </div>
                 
                 <form id="bulkInventoryForm">
-                    <div class="mb-3">
-                        <label for="bulkCategory" class="form-label">Category</label>
-                        <select class="form-select" id="bulkCategory" name="category">
-                            <option value="">Select category...</option>
-                            <option value="Router">Router</option>
-                            <option value="Switch">Switch</option>
-                            <option value="Access Point">Access Point</option>
-                            <option value="Smart Home">Smart Home Device</option>
-                            <option value="Computer">Computer</option>
-                            <option value="Mobile">Mobile Device</option>
-                            <option value="IoT">IoT Device</option>
-                            <option value="Appliance">Appliance</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="bulkBrand" class="form-label">Brand</label>
-                            <input type="text" class="form-control" id="bulkBrand" name="brand">
+                    <!-- Common Settings -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="fas fa-cog me-2"></i>Common Settings</h6>
+                            <small class="text-muted">These settings will be applied to all selected devices</small>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="bulkPurchaseDate" class="form-label">Purchase Date</label>
-                            <input type="date" class="form-control" id="bulkPurchaseDate" name="purchase_date">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="bulkCategory" class="form-label">Category</label>
+                                    <select class="form-select" id="bulkCategory" name="category">
+                                        <option value="">Select category...</option>
+                                        <option value="Router">Router</option>
+                                        <option value="Switch">Switch</option>
+                                        <option value="Access Point">Access Point</option>
+                                        <option value="Smart Home">Smart Home Device</option>
+                                        <option value="Computer">Computer</option>
+                                        <option value="Mobile">Mobile Device</option>
+                                        <option value="IoT">IoT Device</option>
+                                        <option value="Appliance">Appliance</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="bulkBrand" class="form-label">Brand</label>
+                                    <input type="text" class="form-control" id="bulkBrand" name="brand">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="bulkPurchaseDate" class="form-label">Purchase Date</label>
+                                    <input type="date" class="form-control" id="bulkPurchaseDate" name="purchase_date">
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="bulkNotes" class="form-label">Notes</label>
+                                <textarea class="form-control" id="bulkNotes" name="notes" rows="2" 
+                                          placeholder="These notes will be applied to all selected devices"></textarea>
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="bulkNotes" class="form-label">Notes</label>
-                        <textarea class="form-control" id="bulkNotes" name="notes" rows="3" 
-                                  placeholder="These notes will be applied to all selected devices"></textarea>
-                    </div>
-                    
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="useDeviceNames" checked>
-                        <label class="form-check-label" for="useDeviceNames">
-                            Use device hostnames as names (recommended)
-                        </label>
-                        <small class="form-text text-muted d-block">
-                            If unchecked, devices will be named "Device [IP Address]"
-                        </small>
+                    <!-- Individual Device Names -->
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-0"><i class="fas fa-edit me-2"></i>Device Names</h6>
+                                <small class="text-muted">Customize the name for each device</small>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="useDeviceNames" checked onchange="toggleNamingMode()">
+                                <label class="form-check-label" for="useDeviceNames">
+                                    Auto-generate names
+                                </label>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="naming-mode-info" class="alert alert-success mb-3">
+                                <small>
+                                    <i class="fas fa-magic me-1"></i>
+                                    <strong>Auto-generate mode:</strong> Device names will be automatically generated using hostnames when available, or "Device [IP]" as fallback.
+                                </small>
+                            </div>
+                            
+                            <div id="individual-devices-list">
+                                <!-- Individual device name inputs will be populated here -->
+                            </div>
+                        </div>
                     </div>
                 </form>
             </div>

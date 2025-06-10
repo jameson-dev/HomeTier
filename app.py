@@ -426,7 +426,8 @@ def bulk_add_to_inventory():
         data = request.get_json()
         device_ids = data.get('device_ids', [])
         common_data = data.get('common_data', {})
-        use_device_names = data.get('use_device_names', True)
+        use_auto_names = data.get('use_auto_names', True)
+        device_names = data.get('device_names', {})  # Individual device names
         
         if not device_ids:
             return jsonify({'status': 'error', 'message': 'No devices specified'}), 400
@@ -457,11 +458,16 @@ def bulk_add_to_inventory():
                 skipped_count += 1
                 continue
             
-            # Generate device name
-            if use_device_names and device['hostname'] and device['hostname'] != 'Unknown':
-                device_name = device['hostname']
+            # Determine device name
+            if use_auto_names:
+                # Auto-generate name using hostname or IP
+                if device['hostname'] and device['hostname'] != 'Unknown':
+                    device_name = device['hostname']
+                else:
+                    device_name = f"Device {device['ip_address']}"
             else:
-                device_name = f"Device {device['ip_address']}"
+                # Use individually specified name
+                device_name = device_names.get(str(device['id']), f"Device {device['ip_address']}")
             
             # Insert into inventory
             conn.execute('''
