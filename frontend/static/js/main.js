@@ -292,8 +292,8 @@ function renderDevicesTable(devices, inventoryDeviceIds) {
         if (isIgnored) {
             statusBadge = '<span class="badge bg-secondary">Ignored</span>';
             actions = `
-                <button class="btn btn-sm btn-outline-success" onclick="unignoreDevice(${device.id})" title="Unignore device">
-                    <i class="fas fa-eye"></i>
+                <button class="btn btn-sm btn-success me-1" onclick="unignoreDevice(${device.id})" title="Unignore device">
+                    <i class="fas fa-eye"></i> Unignore
                 </button>
             `;
         } else if (isInInventory) {
@@ -497,9 +497,30 @@ async function ignoreDevice(deviceId) {
 }
 
 async function unignoreDevice(deviceId) {
+    if (!confirm('Are you sure you want to unignore this device? It will appear in scans again.')) return;
+
     try {
-        // Add unignore endpoint call here when implemented
-        showNotification('Unignore functionality coming soon', 'info');
+        const response = await fetch(`/api/devices/${deviceId}/unignore`, {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            showNotification('Device unignored successfully', 'success');
+            
+            // Refresh data based on current page
+            if (window.location.pathname.includes('scanning')) {
+                await Promise.all([
+                    loadScanningData(),
+                    loadRecentDevices()
+                ]);
+            } else {
+                await loadRecentDevices();
+            }
+        } else {
+            showNotification(`Error: ${result.message}`, 'danger');
+        }
         
     } catch (error) {
         console.error('Error unignoring device:', error);

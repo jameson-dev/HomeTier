@@ -339,5 +339,30 @@ def ignore_device(device_id):
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/api/devices/<int:device_id>/unignore', methods=['POST'])
+def unignore_device(device_id):
+    try:
+        conn = get_db_connection()
+        
+        # Check if device exists and is currently ignored
+        device = conn.execute(
+            'SELECT * FROM devices WHERE id = ? AND is_ignored = 1', 
+            (device_id,)
+        ).fetchone()
+        
+        if not device:
+            conn.close()
+            return jsonify({'status': 'error', 'message': 'Device not found or not currently ignored'}), 404
+        
+        # Unignore the device
+        conn.execute('UPDATE devices SET is_ignored = 0 WHERE id = ?', (device_id,))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'status': 'success', 'message': 'Device unignored successfully'})
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=app.config['PORT'], debug=app.config['DEBUG'])
