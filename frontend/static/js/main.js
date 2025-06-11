@@ -510,39 +510,33 @@ function populateIndividualDevicesList() {
             : `Device ${device.ip_address}`;
             
         return `
-            <div class="card mb-3 device-config-card border-primary" data-device-id="${device.id}" style="border-width: 2px;">
-                <div class="card-header bg-primary text-white py-3">
+            <div class="card mb-2 device-config-card border-primary" data-device-id="${device.id}" style="border-width: 1px;">
+                <div class="card-header bg-primary text-white py-2">
                     <div class="d-flex align-items-center">
-                        <div class="bg-white text-primary rounded-circle me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; font-size: 1.1rem;">
+                        <div class="bg-white text-primary rounded-circle me-2 d-flex align-items-center justify-content-center" style="width: 28px; height: 28px; font-size: 0.9rem;">
                             <i class="fas fa-desktop"></i>
                         </div>
                         <div class="flex-grow-1">
-                            <h5 class="mb-1">${device.ip_address}</h5>
-                            <div class="d-flex align-items-center">
-                                <span class="badge bg-light text-dark me-2">${device.vendor || 'Unknown vendor'}</span>
-                                <code class="text-white-50">${device.mac_address}</code>
-                            </div>
+                            <h6 class="mb-0">${device.ip_address}</h6>
+                            <small class="text-white-50">${device.vendor || 'Unknown'} • <code>${device.mac_address}</code></small>
                         </div>
-                        <div class="text-end">
-                            <small class="text-white-50">Device ${index + 1} of ${window.bulkEligibleDevices.length}</small>
-                        </div>
+                        <small class="text-white-50">${index + 1}/${window.bulkEligibleDevices.length}</small>
                     </div>
                 </div>
-                <div class="card-body bg-light py-3">
+                <div class="card-body py-2">
                     <!-- Row 1: Name and Category -->
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold text-primary">Device Name *</label>
+                        <div class="col-md-7 mb-2">
+                            <label class="form-label mb-1 fw-bold text-primary small">Device Name *</label>
                             <input type="text" 
-                                   class="form-control form-control-lg device-field border-primary" 
+                                   class="form-control form-control-sm device-field" 
                                    data-field="name"
                                    value="${suggestedName}" 
-                                   required
-                                   style="border-width: 2px;">
+                                   required>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-bold text-primary">Category</label>
-                            <select class="form-select form-select-lg device-field border-primary" data-field="category" style="border-width: 2px;">
+                        <div class="col-md-5 mb-2">
+                            <label class="form-label mb-1 fw-bold text-primary small">Category</label>
+                            <select class="form-select form-select-sm device-field" data-field="category">
                                 <option value="">Select category...</option>
                                 <option value="Router">Router</option>
                                 <option value="Switch">Switch</option>
@@ -559,45 +553,45 @@ function populateIndividualDevicesList() {
                     
                     <!-- Row 2: Brand, Model, Serial -->
                     <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold">Brand</label>
-                            <input type="text" class="form-control device-field" data-field="brand">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label mb-1 small">Brand</label>
+                            <input type="text" class="form-control form-control-sm device-field" data-field="brand">
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold">Model</label>
-                            <input type="text" class="form-control device-field" data-field="model">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label mb-1 small">Model</label>
+                            <input type="text" class="form-control form-control-sm device-field" data-field="model">
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold">Serial Number</label>
-                            <input type="text" class="form-control device-field" data-field="serial_number">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label mb-1 small">Serial Number</label>
+                            <input type="text" class="form-control form-control-sm device-field" data-field="serial_number">
                         </div>
                     </div>
                     
                     <!-- Row 3: Dates and Price -->
                     <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold">Purchase Date</label>
-                            <input type="date" class="form-control device-field" data-field="purchase_date">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label mb-1 small">Purchase Date</label>
+                            <input type="date" class="form-control form-control-sm device-field" data-field="purchase_date">
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold">Warranty Expiry</label>
-                            <input type="date" class="form-control device-field" data-field="warranty_expiry">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label mb-1 small">Warranty Expiry</label>
+                            <input type="date" class="form-control form-control-sm device-field" data-field="warranty_expiry">
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold">Price</label>
-                            <input type="number" step="0.01" class="form-control device-field" data-field="price" placeholder="0.00">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label mb-1 small">Price</label>
+                            <input type="number" step="0.01" class="form-control form-control-sm device-field" data-field="price" placeholder="0.00">
                         </div>
                     </div>
                     
                     <!-- Row 4: Store and Notes -->
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-semibold">Store/Vendor</label>
-                            <input type="text" class="form-control device-field" data-field="store_vendor">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label mb-1 small">Store/Vendor</label>
+                            <input type="text" class="form-control form-control-sm device-field" data-field="store_vendor">
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label fw-semibold">Notes</label>
-                            <textarea class="form-control device-field" data-field="notes" rows="2"></textarea>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label mb-1 small">Notes</label>
+                            <textarea class="form-control form-control-sm device-field" data-field="notes" rows="1"></textarea>
                         </div>
                     </div>
                 </div>
