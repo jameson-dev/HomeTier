@@ -204,140 +204,129 @@
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Add Multiple Devices to Inventory</h5>
+                <div class="flex-grow-1">
+                    <h5 class="modal-title">Add Multiple Devices to Inventory</h5>
+                    <div class="alert alert-info mb-0 mt-2">
+                        <i class="fas fa-info-circle me-2"></i>
+                        You are adding <strong id="bulk-device-count">0</strong> device(s) to inventory.
+                    </div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    You are adding <strong id="bulk-device-count">0</strong> device(s) to inventory.
-                </div>
-                
-                <form id="bulkInventoryForm">
-                    <!-- Mode Selection -->
-                    <div class="card mb-3">
-                        <div class="card-header">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="mb-0"><i class="fas fa-cog me-2"></i>Configuration Mode</h6>
-                                    <small class="text-muted">Choose how to configure the devices</small>
-                                </div>
-                                <div class="btn-group" role="group">
-                                    <input type="radio" class="btn-check" name="configMode" id="commonMode" value="common" checked onchange="toggleConfigMode()">
-                                    <label class="btn btn-outline-primary btn-sm" for="commonMode">
-                                        <i class="fas fa-layer-group me-1"></i>Common Settings
-                                    </label>
-                                    
-                                    <input type="radio" class="btn-check" name="configMode" id="individualMode" value="individual" onchange="toggleConfigMode()">
-                                    <label class="btn btn-outline-success btn-sm" for="individualMode">
-                                        <i class="fas fa-edit me-1"></i>Individual Settings
-                                    </label>
-                                </div>
+            
+            <!-- Mode Selection - Prominent Header -->
+            <div class="bg-light border-bottom">
+                <div class="container-fluid p-3">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h6 class="mb-1"><i class="fas fa-cog me-2"></i>Configuration Mode</h6>
+                            <div id="config-mode-info" class="text-muted small">
+                                <i class="fas fa-layer-group me-1"></i>
+                                <strong>Common Settings Mode:</strong> Apply the same configuration to all selected devices quickly.
                             </div>
                         </div>
-                        <div class="card-body">
-                            <div id="config-mode-info" class="alert alert-primary">
-                                <small>
-                                    <i class="fas fa-layer-group me-1"></i>
-                                    <strong>Common Settings Mode:</strong> Apply the same configuration to all selected devices quickly.
-                                </small>
+                        <div class="col-md-4 text-end">
+                            <div class="btn-group btn-group-lg" role="group">
+                                <input type="radio" class="btn-check" name="configMode" id="commonMode" value="common" checked onchange="toggleConfigMode()">
+                                <label class="btn btn-outline-primary" for="commonMode">
+                                    <i class="fas fa-layer-group me-1"></i>Common Settings
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="configMode" id="individualMode" value="individual" onchange="toggleConfigMode()">
+                                <label class="btn btn-outline-success" for="individualMode">
+                                    <i class="fas fa-edit me-1"></i>Individual Settings
+                                </label>
                             </div>
                         </div>
                     </div>
-                    
+                </div>
+            </div>
+            
+            <div class="modal-body">
+                <form id="bulkInventoryForm">
                     <!-- Common Settings (shown in common mode) -->
-                    <div id="common-settings-section" class="card mb-3">
-                        <div class="card-header">
-                            <h6 class="mb-0"><i class="fas fa-layer-group me-2"></i>Common Settings</h6>
-                            <small class="text-muted">These settings will be applied to all selected devices</small>
+                    <div id="common-settings-section">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label for="bulkCategory" class="form-label">Category</label>
+                                <select class="form-select" id="bulkCategory" name="category">
+                                    <option value="">Select category...</option>
+                                    <option value="Router">Router</option>
+                                    <option value="Switch">Switch</option>
+                                    <option value="Access Point">Access Point</option>
+                                    <option value="Smart Home">Smart Home Device</option>
+                                    <option value="Computer">Computer</option>
+                                    <option value="Mobile">Mobile Device</option>
+                                    <option value="IoT">IoT Device</option>
+                                    <option value="Appliance">Appliance</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="bulkBrand" class="form-label">Brand</label>
+                                <input type="text" class="form-control" id="bulkBrand" name="brand">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="bulkModel" class="form-label">Model</label>
+                                <input type="text" class="form-control" id="bulkModel" name="model">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="bulkPurchaseDate" class="form-label">Purchase Date</label>
+                                <input type="date" class="form-control" id="bulkPurchaseDate" name="purchase_date">
+                            </div>
                         </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-3 mb-3">
-                                    <label for="bulkCategory" class="form-label">Category</label>
-                                    <select class="form-select" id="bulkCategory" name="category">
-                                        <option value="">Select category...</option>
-                                        <option value="Router">Router</option>
-                                        <option value="Switch">Switch</option>
-                                        <option value="Access Point">Access Point</option>
-                                        <option value="Smart Home">Smart Home Device</option>
-                                        <option value="Computer">Computer</option>
-                                        <option value="Mobile">Mobile Device</option>
-                                        <option value="IoT">IoT Device</option>
-                                        <option value="Appliance">Appliance</option>
-                                        <option value="Other">Other</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <label for="bulkBrand" class="form-label">Brand</label>
-                                    <input type="text" class="form-control" id="bulkBrand" name="brand">
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <label for="bulkModel" class="form-label">Model</label>
-                                    <input type="text" class="form-control" id="bulkModel" name="model">
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <label for="bulkPurchaseDate" class="form-label">Purchase Date</label>
-                                    <input type="date" class="form-control" id="bulkPurchaseDate" name="purchase_date">
-                                </div>
+                        
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label for="bulkWarrantyExpiry" class="form-label">Warranty Expiry</label>
+                                <input type="date" class="form-control" id="bulkWarrantyExpiry" name="warranty_expiry">
                             </div>
-                            
-                            <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    <label for="bulkWarrantyExpiry" class="form-label">Warranty Expiry</label>
-                                    <input type="date" class="form-control" id="bulkWarrantyExpiry" name="warranty_expiry">
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label for="bulkStoreVendor" class="form-label">Store/Vendor</label>
-                                    <input type="text" class="form-control" id="bulkStoreVendor" name="store_vendor">
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label for="bulkPrice" class="form-label">Price</label>
-                                    <input type="number" step="0.01" class="form-control" id="bulkPrice" name="price" placeholder="0.00">
-                                </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="bulkStoreVendor" class="form-label">Store/Vendor</label>
+                                <input type="text" class="form-control" id="bulkStoreVendor" name="store_vendor">
                             </div>
-                            
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="bulkSerialNumber" class="form-label">Serial Number</label>
-                                    <input type="text" class="form-control" id="bulkSerialNumber" name="serial_number" placeholder="Leave empty for individual entry">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <div class="form-check mt-4">
-                                        <input class="form-check-input" type="checkbox" id="useDeviceNames" checked>
-                                        <label class="form-check-label" for="useDeviceNames">
-                                            Auto-generate device names
-                                        </label>
-                                        <small class="form-text text-muted d-block">
-                                            Use hostnames when available, otherwise "Device [IP]"
-                                        </small>
-                                    </div>
-                                </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="bulkPrice" class="form-label">Price</label>
+                                <input type="number" step="0.01" class="form-control" id="bulkPrice" name="price" placeholder="0.00">
                             </div>
-                            
-                            <div class="mb-3">
+                            <div class="col-md-3 mb-3">
+                                <label for="bulkSerialNumber" class="form-label">Serial Number</label>
+                                <input type="text" class="form-control" id="bulkSerialNumber" name="serial_number" placeholder="Leave empty for individual">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
                                 <label for="bulkNotes" class="form-label">Notes</label>
                                 <textarea class="form-control" id="bulkNotes" name="notes" rows="2" 
                                           placeholder="These notes will be applied to all selected devices"></textarea>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Device Names</label>
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" id="useDeviceNames" checked>
+                                    <label class="form-check-label" for="useDeviceNames">
+                                        Auto-generate device names
+                                    </label>
+                                    <small class="form-text text-muted d-block">
+                                        Use hostnames when available, otherwise "Device [IP]"
+                                    </small>
+                                </div>
                             </div>
                         </div>
                     </div>
                     
                     <!-- Individual Device Settings (shown in individual mode) -->
-                    <div id="individual-settings-section" class="card" style="display: none;">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-0"><i class="fas fa-edit me-2"></i>Individual Device Settings</h6>
-                                <small class="text-muted">Customize settings for each device</small>
-                            </div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyCommonToAll()">
+                    <div id="individual-settings-section" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0"><i class="fas fa-edit me-2"></i>Individual Device Settings</h6>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="copyCommonToAll()">
                                 <i class="fas fa-copy me-1"></i>Copy Common Settings to All
                             </button>
                         </div>
-                        <div class="card-body">
-                            <div id="individual-devices-list">
-                                <!-- Individual device forms will be populated here -->
-                            </div>
+                        
+                        <div id="individual-devices-list" style="max-height: 60vh; overflow-y: auto;">
+                            <!-- Individual device forms will be populated here -->
                         </div>
                     </div>
                 </form>

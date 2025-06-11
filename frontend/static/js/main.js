@@ -483,22 +483,16 @@ function toggleConfigMode() {
     const individualSection = document.getElementById('individual-settings-section');
     
     if (isCommonMode) {
-        infoDiv.className = 'alert alert-primary';
         infoDiv.innerHTML = `
-            <small>
-                <i class="fas fa-layer-group me-1"></i>
-                <strong>Common Settings Mode:</strong> Apply the same configuration to all selected devices quickly.
-            </small>
+            <i class="fas fa-layer-group me-1"></i>
+            <strong>Common Settings Mode:</strong> Apply the same configuration to all selected devices quickly.
         `;
         commonSection.style.display = 'block';
         individualSection.style.display = 'none';
     } else {
-        infoDiv.className = 'alert alert-success';
         infoDiv.innerHTML = `
-            <small>
-                <i class="fas fa-edit me-1"></i>
-                <strong>Individual Settings Mode:</strong> Customize each device with unique settings and details.
-            </small>
+            <i class="fas fa-edit me-1"></i>
+            <strong>Individual Settings Mode:</strong> Customize each device with unique settings and details.
         `;
         commonSection.style.display = 'none';
         individualSection.style.display = 'block';
@@ -515,34 +509,34 @@ function populateIndividualDevicesList() {
             : `Device ${device.ip_address}`;
             
         return `
-            <div class="card mb-3 device-config-card" data-device-id="${device.id}">
-                <div class="card-header">
+            <div class="card mb-2 device-config-card" data-device-id="${device.id}">
+                <div class="card-header py-2">
                     <div class="d-flex align-items-center">
-                        <div class="device-icon bg-light me-2">
+                        <div class="device-icon bg-light me-2" style="width: 20px; height: 20px; font-size: 0.75rem;">
                             <i class="fas fa-desktop"></i>
                         </div>
                         <div>
                             <h6 class="mb-0">${device.ip_address}</h6>
                             <small class="text-muted">
-                                ${device.vendor || 'Unknown vendor'} • 
-                                <code>${device.mac_address}</code>
+                                ${device.vendor || 'Unknown vendor'} • <code>${device.mac_address}</code>
                             </small>
                         </div>
                     </div>
                 </div>
-                <div class="card-body">
+                <div class="card-body py-2">
+                    <!-- Row 1: Name and Category -->
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Device Name *</label>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label mb-1 small">Device Name *</label>
                             <input type="text" 
-                                   class="form-control device-field" 
+                                   class="form-control form-control-sm device-field" 
                                    data-field="name"
                                    value="${suggestedName}" 
                                    required>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Category</label>
-                            <select class="form-select device-field" data-field="category">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label mb-1 small">Category</label>
+                            <select class="form-select form-select-sm device-field" data-field="category">
                                 <option value="">Select category...</option>
                                 <option value="Router">Router</option>
                                 <option value="Switch">Switch</option>
@@ -557,44 +551,47 @@ function populateIndividualDevicesList() {
                         </div>
                     </div>
                     
+                    <!-- Row 2: Brand, Model, Serial -->
                     <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Brand</label>
-                            <input type="text" class="form-control device-field" data-field="brand">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label mb-1 small">Brand</label>
+                            <input type="text" class="form-control form-control-sm device-field" data-field="brand">
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Model</label>
-                            <input type="text" class="form-control device-field" data-field="model">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label mb-1 small">Model</label>
+                            <input type="text" class="form-control form-control-sm device-field" data-field="model">
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Serial Number</label>
-                            <input type="text" class="form-control device-field" data-field="serial_number">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label mb-1 small">Serial Number</label>
+                            <input type="text" class="form-control form-control-sm device-field" data-field="serial_number">
                         </div>
                     </div>
                     
+                    <!-- Row 3: Dates and Price -->
                     <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Purchase Date</label>
-                            <input type="date" class="form-control device-field" data-field="purchase_date">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label mb-1 small">Purchase Date</label>
+                            <input type="date" class="form-control form-control-sm device-field" data-field="purchase_date">
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Warranty Expiry</label>
-                            <input type="date" class="form-control device-field" data-field="warranty_expiry">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label mb-1 small">Warranty Expiry</label>
+                            <input type="date" class="form-control form-control-sm device-field" data-field="warranty_expiry">
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Price</label>
-                            <input type="number" step="0.01" class="form-control device-field" data-field="price" placeholder="0.00">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label mb-1 small">Price</label>
+                            <input type="number" step="0.01" class="form-control form-control-sm device-field" data-field="price" placeholder="0.00">
                         </div>
                     </div>
                     
+                    <!-- Row 4: Store and Notes -->
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Store/Vendor</label>
-                            <input type="text" class="form-control device-field" data-field="store_vendor">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label mb-1 small">Store/Vendor</label>
+                            <input type="text" class="form-control form-control-sm device-field" data-field="store_vendor">
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Notes</label>
-                            <textarea class="form-control device-field" data-field="notes" rows="2"></textarea>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label mb-1 small">Notes</label>
+                            <textarea class="form-control form-control-sm device-field" data-field="notes" rows="1"></textarea>
                         </div>
                     </div>
                 </div>
