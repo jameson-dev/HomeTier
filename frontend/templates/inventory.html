@@ -7,9 +7,14 @@
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center">
             <h2><i class="fas fa-boxes me-2"></i>Device Inventory</h2>
-            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addInventoryModal">
-                <i class="fas fa-plus me-2"></i>Add Device
-            </button>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('categories') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-tags me-2"></i>Manage Categories
+                </a>
+                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addInventoryModal">
+                    <i class="fas fa-plus me-2"></i>Add Device
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -24,15 +29,7 @@
                         <label for="categoryFilter" class="form-label">Category</label>
                         <select class="form-select" id="categoryFilter">
                             <option value="">All Categories</option>
-                            <option value="Router">Router</option>
-                            <option value="Switch">Switch</option>
-                            <option value="Access Point">Access Point</option>
-                            <option value="Smart Home">Smart Home Device</option>
-                            <option value="Computer">Computer</option>
-                            <option value="Mobile">Mobile Device</option>
-                            <option value="IoT">IoT Device</option>
-                            <option value="Appliance">Appliance</option>
-                            <option value="Other">Other</option>
+                            <!-- Categories will be loaded dynamically -->
                         </select>
                     </div>
                     <div class="col-md-3">
@@ -150,18 +147,17 @@
                         </div>
                         <div class="col-md-4 mb-3">
                             <label for="newCategory" class="form-label">Category *</label>
-                            <select class="form-select" id="newCategory" name="category" required>
-                                <option value="">Select category...</option>
-                                <option value="Router">Router</option>
-                                <option value="Switch">Switch</option>
-                                <option value="Access Point">Access Point</option>
-                                <option value="Smart Home">Smart Home Device</option>
-                                <option value="Computer">Computer</option>
-                                <option value="Mobile">Mobile Device</option>
-                                <option value="IoT">IoT Device</option>
-                                <option value="Appliance">Appliance</option>
-                                <option value="Other">Other</option>
-                            </select>
+                            <div class="d-flex align-items-center">
+                                <select class="form-select me-2" id="newCategory" name="category_id" required>
+                                    <option value="">Select category...</option>
+                                    <!-- Categories loaded dynamically -->
+                                </select>
+                                <a href="{{ url_for('categories') }}" target="_blank" 
+                                   class="btn btn-outline-secondary btn-sm" 
+                                   title="Manage categories">
+                                    <i class="fas fa-cog"></i>
+                                </a>
+                            </div>
                         </div>
                     </div>
                     
@@ -224,6 +220,33 @@
     // Load inventory data on page load
     document.addEventListener('DOMContentLoaded', function() {
         loadInventoryData();
+        loadCategoriesForFilters();
     });
+    
+    // Load categories for filter dropdown
+    async function loadCategoriesForFilters() {
+        try {
+            const response = await fetch('/api/categories');
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                const categoryFilter = document.getElementById('categoryFilter');
+                if (categoryFilter) {
+                    // Clear existing options except first
+                    categoryFilter.innerHTML = '<option value="">All Categories</option>';
+                    
+                    // Add categories
+                    result.categories.forEach(category => {
+                        const option = document.createElement('option');
+                        option.value = category.name;
+                        option.textContent = category.name;
+                        categoryFilter.appendChild(option);
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error loading categories for filters:', error);
+        }
+    }
 </script>
 {% endblock %}

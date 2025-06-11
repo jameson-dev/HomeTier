@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify
-from backend.database import init_db, get_db_connection
+from backend.database import init_db, get_db_connection, get_categories, add_category, update_category, delete_category
 from backend.scanner import NetworkScanner
 from config import Config
 import json
@@ -28,6 +28,11 @@ def inventory():
 def scanning():
     return render_template('scanning.html')
 
+@app.route('/categories')
+def categories():
+    return render_template('categories.html')
+
+
 @app.route('/api/devices', methods=['GET'])
 def get_devices():
     conn = get_db_connection()
@@ -36,18 +41,121 @@ def get_devices():
     
     return jsonify([dict(device) for device in devices])
 
+@app.route('/api/categories', methods=['GET'])
+def get_categories_api():
+    """Get all categories"""
+    try:
+        categories = get_categories()
+        return jsonify({'status': 'success', 'categories': categories})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/categories', methods=['POST'])
+def add_category_api():
+    """Add a new category"""
+    try:
+        data = request.get_json()
+        
+        if not data or not data.get('name'):
+            return jsonify({'status': 'error', 'message': 'Category name is required'}), 400
+        
+        name = data['name'].strip()
+        description = data.get('description', '').strip() or None
+        icon = data.get('icon', 'fas fa-desktop')
+        color = data.get('color', '#0d6efd')
+        
+        if len(name) < 2:
+            return jsonify({'status': 'error', 'message': 'Category name must be at least 2 characters'}), 400
+        
+        if len(name) > 50:
+            return jsonify({'status': 'error', 'message': 'Category name must be less than 50 characters'}), 400
+        
+        category_id = add_category(name, description, icon, color)
+        
+        return jsonify({
+            'status': 'success', 
+            'message': 'Category created successfully',
+            'category_id': category_id
+        })
+        
+    except ValueError as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/categories/<int:category_id>', methods=['PUT'])
+def update_category_api(category_id):
+    """Update an existing category"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'status': 'error', 'message': 'No data provided'}), 400
+        
+        # Validate name if provided
+        if 'name' in data:
+            name = data['name'].strip()
+            if len(name) < 2:
+                return jsonify({'status': 'error', 'message': 'Category name must be at least 2 characters'}), 400
+            if len(name) > 50:
+                return jsonify({'status': 'error', 'message': 'Category name must be less than 50 characters'}), 400
+            data['name'] = name
+        
+        # Validate description if provided
+        if 'description' in data:
+            data['description'] = data['description'].strip() or None
+        
+        update_category(
+            category_id,
+            name=data.get('name'),
+            description=data.get('description'),
+            icon=data.get('icon'),
+            color=data.get('color')
+        )
+        
+        return jsonify({
+            'status': 'success', 
+            'message': 'Category updated successfully'
+        })
+        
+    except ValueError as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/categories/<int:category_id>', methods=['DELETE'])
+def delete_category_api(category_id):
+    """Delete a category"""
+    try:
+        delete_category(category_id)
+        
+        return jsonify({
+            'status': 'success', 
+            'message': 'Category deleted successfully'
+        })
+        
+    except ValueError as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/dashboard/stats', methods=['GET'])
 def get_dashboard_stats():
     """Get dashboard statistics including category breakdown and warranty alerts"""
     try:
         conn = get_db_connection()
         
-        # Category statistics
+        # Category statistics with proper joins
         category_stats = conn.execute('''
-            SELECT category, COUNT(*) as count
-            FROM inventory 
-            WHERE deleted_at IS NULL 
-            GROUP BY category
+            SELECT 
+                COALESCE(c.name, i.category, 'Uncategorized') as category,
+                COUNT(*) as count,
+                COALESCE(c.color, '#6c757d') as color,
+                COALESCE(c.icon, 'fas fa-question') as icon
+            FROM inventory i
+            LEFT JOIN categories c ON i.category_id = c.id
+            WHERE i.deleted_at IS NULL 
+            GROUP BY COALESCE(c.name, i.category, 'Uncategorized')
             ORDER BY count DESC
         ''').fetchall()
         
@@ -134,9 +242,16 @@ def get_scanning_stats():
 def get_inventory():
     conn = get_db_connection()
     inventory = conn.execute('''
-        SELECT i.*, d.ip_address, d.mac_address 
+        SELECT 
+            i.*, 
+            d.ip_address, 
+            d.mac_address,
+            c.name as category_name,
+            c.icon as category_icon,
+            c.color as category_color
         FROM inventory i
         LEFT JOIN devices d ON i.device_id = d.id
+        LEFT JOIN categories c ON i.category_id = c.id
         WHERE i.deleted_at IS NULL
         ORDER BY i.created_at DESC
     ''').fetchall()
@@ -149,6 +264,24 @@ def add_inventory():
     try:
         data = request.form
         conn = get_db_connection()
+        
+        # Handle category - could be category_id or legacy category text
+        category_id = data.get('category_id')
+        category_text = data.get('category')
+        
+        # If category_id is provided, use it; otherwise try to find category by name
+        if category_id and category_id.isdigit():
+            category_id = int(category_id)
+            # Verify category exists
+            category = conn.execute('SELECT name FROM categories WHERE id = ?', (category_id,)).fetchone()
+            category_text = category['name'] if category else None
+        elif category_text:
+            # Try to find category by name
+            category = conn.execute('SELECT id FROM categories WHERE name = ?', (category_text,)).fetchone()
+            category_id = category['id'] if category else None
+        else:
+            category_id = None
+            category_text = None
         
         # Check if device is already in inventory (only if device_id provided)
         if data.get('device_id'):
@@ -175,13 +308,14 @@ def add_inventory():
                 # Restore the soft-deleted item with new data
                 conn.execute('''
                     UPDATE inventory 
-                    SET name = ?, category = ?, brand = ?, model = ?, purchase_date = ?, 
+                    SET name = ?, category_id = ?, category = ?, brand = ?, model = ?, purchase_date = ?, 
                         warranty_expiry = ?, store_vendor = ?, price = ?, serial_number = ?, 
                         notes = ?, deleted_at = NULL, updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                 ''', (
                     data.get('name'),
-                    data.get('category'),
+                    category_id,
+                    category_text,
                     data.get('brand'),
                     data.get('model'),
                     data.get('purchase_date') or None,
@@ -200,13 +334,14 @@ def add_inventory():
         
         # Create new inventory item if no existing record found
         cursor = conn.execute('''
-            INSERT INTO inventory (device_id, name, category, brand, model, purchase_date, 
+            INSERT INTO inventory (device_id, name, category_id, category, brand, model, purchase_date, 
                                  warranty_expiry, store_vendor, price, serial_number, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('device_id') or None,
             data.get('name'),
-            data.get('category'),
+            category_id,
+            category_text,
             data.get('brand'),
             data.get('model'),
             data.get('purchase_date') or None,
@@ -258,9 +393,10 @@ def export_inventory(format):
     try:
         conn = get_db_connection()
         inventory = conn.execute('''
-            SELECT i.*, d.ip_address, d.mac_address, d.hostname
+            SELECT i.*, d.ip_address, d.mac_address, d.hostname, c.name as category_name
             FROM inventory i
             LEFT JOIN devices d ON i.device_id = d.id
+            LEFT JOIN categories c ON i.category_id = c.id
             WHERE i.deleted_at IS NULL
             ORDER BY i.created_at DESC
         ''').fetchall()
@@ -296,7 +432,7 @@ def export_to_csv(inventory):
         writer.writerow([
             item['id'],
             item['name'],
-            item['category'] or '',
+            item['category_name'] or item['category'] or '',
             item['brand'] or '',
             item['model'] or '',
             item['purchase_date'] or '',
@@ -328,7 +464,7 @@ def export_to_json(inventory):
         data.append({
             'id': item['id'],
             'name': item['name'],
-            'category': item['category'],
+            'category': item['category_name'] or item['category'],
             'brand': item['brand'],
             'model': item['model'],
             'purchase_date': item['purchase_date'],
@@ -374,7 +510,6 @@ def unignore_device(device_id):
     try:
         conn = get_db_connection()
         
-        # Check if device exists and is currently ignored
         device = conn.execute(
             'SELECT * FROM devices WHERE id = ? AND is_ignored = 1', 
             (device_id,)
@@ -384,7 +519,6 @@ def unignore_device(device_id):
             conn.close()
             return jsonify({'status': 'error', 'message': 'Device not found or not currently ignored'}), 404
         
-        # Unignore the device
         conn.execute('UPDATE devices SET is_ignored = 0 WHERE id = ?', (device_id,))
         conn.commit()
         conn.close()
@@ -405,7 +539,6 @@ def bulk_ignore_devices():
         
         conn = get_db_connection()
         
-        # Update all specified devices
         placeholders = ','.join(['?' for _ in device_ids])
         conn.execute(f'UPDATE devices SET is_ignored = 1 WHERE id IN ({placeholders})', device_ids)
         
@@ -433,7 +566,6 @@ def bulk_unignore_devices():
         
         conn = get_db_connection()
         
-        # Update all specified devices
         placeholders = ','.join(['?' for _ in device_ids])
         conn.execute(f'UPDATE devices SET is_ignored = 0 WHERE id IN ({placeholders})', device_ids)
         
@@ -508,18 +640,23 @@ def bulk_add_to_inventory():
                 else:
                     device_name = f"Device {device['ip_address']}"
                 
+                # Handle category
+                category_id = common_data.get('category_id')
+                category_name = common_data.get('category')
+                
                 # Check if this device was soft-deleted
                 if device['id'] in deleted_device_map:
                     # Restore the soft-deleted item
                     conn.execute('''
                         UPDATE inventory 
-                        SET name = ?, category = ?, brand = ?, model = ?, purchase_date = ?, 
+                        SET name = ?, category_id = ?, category = ?, brand = ?, model = ?, purchase_date = ?, 
                             warranty_expiry = ?, store_vendor = ?, price = ?, serial_number = ?, 
                             notes = ?, deleted_at = NULL, updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?
                     ''', (
                         device_name,
-                        common_data.get('category'),
+                        category_id,
+                        category_name,
                         common_data.get('brand'),
                         common_data.get('model'),
                         common_data.get('purchase_date') or None,
@@ -534,13 +671,14 @@ def bulk_add_to_inventory():
                 else:
                     # Insert new inventory item
                     conn.execute('''
-                        INSERT INTO inventory (device_id, name, category, brand, model, purchase_date, 
+                        INSERT INTO inventory (device_id, name, category_id, category, brand, model, purchase_date, 
                                              warranty_expiry, store_vendor, price, serial_number, notes)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (
                         device['id'],
                         device_name,
-                        common_data.get('category'),
+                        category_id,
+                        category_name,
                         common_data.get('brand'),
                         common_data.get('model'),
                         common_data.get('purchase_date') or None,
@@ -567,18 +705,23 @@ def bulk_add_to_inventory():
                 # Use provided name or generate fallback
                 device_name = individual_data.get('name') or f"Device {device['ip_address']}"
                 
+                # Handle category
+                category_id = individual_data.get('category_id')
+                category_name = individual_data.get('category')
+                
                 # Check if this device was soft-deleted
                 if device['id'] in deleted_device_map:
                     # Restore the soft-deleted item
                     conn.execute('''
                         UPDATE inventory 
-                        SET name = ?, category = ?, brand = ?, model = ?, purchase_date = ?, 
+                        SET name = ?, category_id = ?, category = ?, brand = ?, model = ?, purchase_date = ?, 
                             warranty_expiry = ?, store_vendor = ?, price = ?, serial_number = ?, 
                             notes = ?, deleted_at = NULL, updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?
                     ''', (
                         device_name,
-                        individual_data.get('category'),
+                        category_id,
+                        category_name,
                         individual_data.get('brand'),
                         individual_data.get('model'),
                         individual_data.get('purchase_date') or None,
@@ -593,13 +736,14 @@ def bulk_add_to_inventory():
                 else:
                     # Insert new inventory item
                     conn.execute('''
-                        INSERT INTO inventory (device_id, name, category, brand, model, purchase_date, 
+                        INSERT INTO inventory (device_id, name, category_id, category, brand, model, purchase_date, 
                                              warranty_expiry, store_vendor, price, serial_number, notes)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (
                         device['id'],
                         device_name,
-                        individual_data.get('category'),
+                        category_id,
+                        category_name,
                         individual_data.get('brand'),
                         individual_data.get('model'),
                         individual_data.get('purchase_date') or None,
@@ -638,6 +782,7 @@ def bulk_add_to_inventory():
         
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+    
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=app.config['PORT'], debug=app.config['DEBUG'])
