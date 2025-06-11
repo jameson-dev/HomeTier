@@ -70,35 +70,43 @@
     </div>
 </div>
 
-<!-- Control Panel -->
+<!-- Quick Actions -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title mb-0">
-                    <i class="fas fa-search me-2"></i>Network Scanner
+                    <i class="fas fa-tachometer-alt me-2"></i>Quick Actions
                 </h5>
             </div>
             <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-md-6">
-                        <p class="mb-2">Discover new devices on your network</p>
-                        <small class="text-muted">Last scan: <span id="last-scan-display">Never</span></small>
-                    </div>
-                    <div class="col-md-6 text-end">
-                        <button id="scan-btn" class="btn btn-primary">
-                            <i class="fas fa-search me-2"></i>Start Scan
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Scan Progress -->
-                <div id="scan-progress" class="mt-3" style="display: none;">
-                    <div class="progress">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                             role="progressbar" style="width: 100%">
-                            Scanning network...
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <div class="d-grid">
+                            <a href="{{ url_for('scanning') }}" class="btn btn-primary btn-lg">
+                                <i class="fas fa-search me-2"></i>
+                                Scan Network
+                            </a>
                         </div>
+                        <small class="text-muted">Discover new devices on your network</small>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="d-grid">
+                            <a href="{{ url_for('inventory') }}" class="btn btn-success btn-lg">
+                                <i class="fas fa-plus me-2"></i>
+                                Add Device
+                            </a>
+                        </div>
+                        <small class="text-muted">Manually add a device to inventory</small>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="d-grid">
+                            <a href="{{ url_for('inventory') }}" class="btn btn-info btn-lg">
+                                <i class="fas fa-list me-2"></i>
+                                View Inventory
+                            </a>
+                        </div>
+                        <small class="text-muted">Browse your complete device inventory</small>
                     </div>
                 </div>
             </div>
@@ -106,111 +114,38 @@
     </div>
 </div>
 
-<!-- Recent Devices -->
+<!-- Summary Statistics -->
 <div class="row">
-    <div class="col-12">
+    <div class="col-md-6">
         <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-header">
                 <h5 class="card-title mb-0">
-                    <i class="fas fa-history me-2"></i>Recently Discovered Devices
+                    <i class="fas fa-chart-pie me-2"></i>Device Categories
                 </h5>
-                <button class="btn btn-sm btn-outline-primary" onclick="refreshDevices()">
-                    <i class="fas fa-refresh me-1"></i>Refresh
-                </button>
             </div>
             <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>IP Address</th>
-                                <th>MAC Address</th>
-                                <th>Hostname</th>
-                                <th>Vendor</th>
-                                <th>First Seen</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="devices-table">
-                            <tr>
-                                <td colspan="6" class="text-center text-muted">
-                                    <i class="fas fa-spinner fa-spin me-2"></i>Loading devices...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div id="category-stats">
+                    <div class="text-center text-muted">
+                        <i class="fas fa-spinner fa-spin me-2"></i>Loading statistics...
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
-
-<!-- Add to Inventory Modal -->
-<div class="modal fade" id="addToInventoryModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add Device to Inventory</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Warranty Alerts
+                </h5>
             </div>
-            <div class="modal-body">
-                <form id="inventoryForm">
-                    <input type="hidden" id="deviceId" name="device_id">
-                    
-                    <div class="mb-3">
-                        <label for="deviceName" class="form-label">Device Name *</label>
-                        <input type="text" class="form-control" id="deviceName" name="name" required>
+            <div class="card-body">
+                <div id="warranty-alerts">
+                    <div class="text-center text-muted">
+                        <i class="fas fa-spinner fa-spin me-2"></i>Loading warranty data...
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="category" class="form-label">Category</label>
-                        <select class="form-select" id="category" name="category">
-                            <option value="">Select category...</option>
-                            <option value="Router">Router</option>
-                            <option value="Switch">Switch</option>
-                            <option value="Access Point">Access Point</option>
-                            <option value="Smart Home">Smart Home Device</option>
-                            <option value="Computer">Computer</option>
-                            <option value="Mobile">Mobile Device</option>
-                            <option value="IoT">IoT Device</option>
-                            <option value="Appliance">Appliance</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="brand" class="form-label">Brand</label>
-                            <input type="text" class="form-control" id="brand" name="brand">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="model" class="form-label">Model</label>
-                            <input type="text" class="form-control" id="model" name="model">
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="purchaseDate" class="form-label">Purchase Date</label>
-                            <input type="date" class="form-control" id="purchaseDate" name="purchase_date">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="warrantyExpiry" class="form-label">Warranty Expiry</label>
-                            <input type="date" class="form-control" id="warrantyExpiry" name="warranty_expiry">
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="notes" class="form-label">Notes</label>
-                        <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveToInventory()">
-                    <i class="fas fa-save me-2"></i>Save to Inventory
-                </button>
+                </div>
             </div>
         </div>
     </div>
@@ -222,7 +157,8 @@
     // Load dashboard data on page load
     document.addEventListener('DOMContentLoaded', function() {
         loadDashboardData();
-        loadRecentDevices();
+        loadCategoryStats();
+        loadWarrantyAlerts();
     });
 </script>
 {% endblock %}
