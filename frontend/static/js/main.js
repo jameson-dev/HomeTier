@@ -6,6 +6,7 @@ let currentInventory = [];
 let scanInProgress = false;
 let currentFilter = 'all';
 let selectedDevices = new Set(); // Track selected device IDs
+let selectedInventoryItems = new Set(); // Track selected inventory item IDs
 
 // Utility functions
 function formatDate(dateString) {
@@ -345,7 +346,7 @@ function renderDevicesTable(devices, inventoryDeviceIds) {
     updateSelectAllCheckbox();
 }
 
-// Bulk selection functions
+// Bulk selection functions for devices
 function toggleDeviceSelection(deviceId, isSelected) {
     if (isSelected) {
         selectedDevices.add(deviceId);
@@ -437,7 +438,7 @@ function clearSelection() {
     updateSelectAllCheckbox();
 }
 
-// Bulk operation functions
+// Bulk operation functions for devices
 async function bulkAddToInventory() {
     if (selectedDevices.size === 0) {
         showNotification('No devices selected', 'warning');
@@ -924,7 +925,7 @@ async function startNetworkScan() {
     }
 }
 
-// Device management functions
+// Individual device management functions
 function addToInventory(deviceId) {
     const device = currentDevices.find(d => d.id === deviceId);
     if (!device) return;
@@ -1059,26 +1060,6 @@ async function unignoreDevice(deviceId) {
     }
 }
 
-// Event listeners
-document.addEventListener('DOMContentLoaded', function () {
-    // Bind scan button
-    const scanBtn = document.getElementById('scan-btn');
-    if (scanBtn) {
-        scanBtn.addEventListener('click', startNetworkScan);
-    }
-});
-
-// Auto-refresh every 30 seconds
-setInterval(() => {
-    if (!scanInProgress) {
-        if (window.location.pathname.includes('scanning')) {
-            loadScanningData();
-        } else {
-            loadDashboardData();
-        }
-    }
-}, 30000);
-
 // Inventory-specific functions
 async function loadInventoryData() {
     try {
@@ -1102,7 +1083,7 @@ function updateInventoryTable(inventory) {
     if (inventory.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="text-center text-muted">
+                <td colspan="8" class="text-center text-muted">
                     No inventory items found. Add devices to get started.
                 </td>
             </tr>
@@ -1110,39 +1091,52 @@ function updateInventoryTable(inventory) {
         return;
     }
 
-    tbody.innerHTML = inventory.map(item => `
-        <tr>
-            <td>
-                <strong>${item.name}</strong>
-                ${item.serial_number ? `<br><small class="text-muted">S/N: ${item.serial_number}</small>` : ''}
-            </td>
-            <td>
-                <span class="badge bg-secondary">${item.category || 'Uncategorized'}</span>
-            </td>
-            <td>
-                ${item.brand ? `<strong>${item.brand}</strong>` : ''}
-                ${item.model ? `<br>${item.model}` : ''}
-            </td>
-            <td>${formatDate(item.purchase_date)}</td>
-            <td>
-                ${getWarrantyStatus(item.warranty_expiry)}
-            </td>
-            <td>
-                ${item.ip_address ? `IP: ${item.ip_address}<br>` : ''}
-                ${item.mac_address ? `<code>${item.mac_address}</code>` : 'Not connected'}
-                ${item.hostname && item.hostname !== 'Unknown' ? `<br>${item.hostname}` : ''}
-            </td>
-            <td>
-                <button class="btn btn-sm btn-outline-primary me-1" onclick="editInventoryItem(${item.id})">
-                    <i class="fas fa-edit"></i>
+    tbody.innerHTML = inventory.map(item => {
+        const isSelected = selectedInventoryItems.has(item.id);
+        
+        return `
+            <tr data-inventory-id="${item.id}">
+                <td>
+                    <input type="checkbox" class="inventory-checkbox" 
+                           data-inventory-id="${item.id}" 
+                           ${isSelected ? 'checked' : ''}
+                           onchange="toggleInventorySelection(${item.id}, this.checked)">
+                </td>
+                <td>
+                    <strong>${item.name}</strong>
+                    ${item.serial_number ? `<br><small class="text-muted">S/N: ${item.serial_number}</small>` : ''}
+                </td>
+                <td>
+                    <span class="badge bg-secondary">${item.category || 'Uncategorized'}</span>
+                </td>
+                <td>
+                    ${item.brand ? `<strong>${item.brand}</strong>` : ''}
+                    ${item.model ? `<br>${item.model}` : ''}
+                </td>
+                <td>${formatDate(item.purchase_date)}</td>
+                <td>
+                    ${getWarrantyStatus(item.warranty_expiry)}
+                </td>
+                <td>
+                    ${item.ip_address ? `IP: ${item.ip_address}<br>` : ''}
+                    ${item.mac_address ? `<code>${item.mac_address}</code>` : 'Not connected'}
+                    ${item.hostname && item.hostname !== 'Unknown' ? `<br>${item.hostname}` : ''}
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editInventoryItem(${item.id})">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteInventoryItem(${item.id})" 
+                        title="Delete this item">
+                    <i class="fas fa-trash"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteInventoryItem(${item.id})" 
-                    title="Delete this item">
-                <i class="fas fa-trash"></i> Delete
-            </button>
-            </td>
-        </tr>
-    `).join('');
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    // Update select all checkbox state
+    updateSelectAllInventoryCheckbox();
 }
 
 function getWarrantyStatus(warrantyExpiry) {
@@ -1165,6 +1159,144 @@ function updateInventoryCount(count) {
     const countElement = document.getElementById('inventory-count');
     if (countElement) {
         countElement.textContent = count;
+    }
+}
+
+// Inventory bulk selection functions
+function toggleInventorySelection(inventoryId, isSelected) {
+    if (isSelected) {
+        selectedInventoryItems.add(inventoryId);
+    } else {
+        selectedInventoryItems.delete(inventoryId);
+    }
+    updateInventoryBulkActionsBar();
+    updateSelectAllInventoryCheckbox();
+}
+
+function toggleSelectAllInventory(checkbox) {
+    const inventoryCheckboxes = document.querySelectorAll('.inventory-checkbox');
+    const visibleInventoryIds = Array.from(inventoryCheckboxes).map(cb => parseInt(cb.dataset.inventoryId));
+    
+    if (checkbox.checked) {
+        // Select all visible inventory items
+        visibleInventoryIds.forEach(id => selectedInventoryItems.add(id));
+        inventoryCheckboxes.forEach(cb => cb.checked = true);
+    } else {
+        // Deselect all visible inventory items
+        visibleInventoryIds.forEach(id => selectedInventoryItems.delete(id));
+        inventoryCheckboxes.forEach(cb => cb.checked = false);
+    }
+    updateInventoryBulkActionsBar();
+}
+
+function updateSelectAllInventoryCheckbox() {
+    const selectAllCheckbox = document.getElementById('select-all-inventory-checkbox');
+    const inventoryCheckboxes = document.querySelectorAll('.inventory-checkbox');
+    
+    if (!selectAllCheckbox || inventoryCheckboxes.length === 0) return;
+    
+    const checkedCount = Array.from(inventoryCheckboxes).filter(cb => cb.checked).length;
+    
+    if (checkedCount === 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+    } else if (checkedCount === inventoryCheckboxes.length) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+    } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+    }
+}
+
+function updateInventoryBulkActionsBar() {
+    const bulkActionsBar = document.getElementById('inventory-bulk-actions-bar');
+    const selectedCountSpan = document.getElementById('inventory-selected-count');
+    
+    if (!bulkActionsBar) return;
+    
+    const selectedCount = selectedInventoryItems.size;
+    
+    if (selectedCount === 0) {
+        bulkActionsBar.style.display = 'none';
+        return;
+    }
+    
+    bulkActionsBar.style.display = 'block';
+    selectedCountSpan.textContent = selectedCount;
+}
+
+function clearInventorySelection() {
+    selectedInventoryItems.clear();
+    document.querySelectorAll('.inventory-checkbox').forEach(cb => cb.checked = false);
+    updateInventoryBulkActionsBar();
+    updateSelectAllInventoryCheckbox();
+}
+
+async function bulkDeleteInventoryItems() {
+    if (selectedInventoryItems.size === 0) {
+        showNotification('No items selected', 'warning');
+        return;
+    }
+    
+    const selectedCount = selectedInventoryItems.size;
+    
+    if (!confirm(`Are you sure you want to delete ${selectedCount} inventory item(s)? This action cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        // Delete items one by one (could be optimized with a bulk endpoint)
+        const deletionPromises = Array.from(selectedInventoryItems).map(async (itemId) => {
+            const response = await fetch(`/api/inventory/${itemId}`, {
+                method: 'DELETE'
+            });
+            return response.json();
+        });
+
+        const results = await Promise.all(deletionPromises);
+        
+        // Check if all deletions were successful
+        const successCount = results.filter(result => result.status === 'success').length;
+        const failureCount = results.length - successCount;
+        
+        if (successCount > 0) {
+            showNotification(`Successfully deleted ${successCount} item(s)${failureCount > 0 ? ` (${failureCount} failed)` : ''}`, 'success');
+            
+            clearInventorySelection();
+            await loadInventoryData(); // Refresh the inventory table
+        } else {
+            showNotification('Failed to delete selected items', 'danger');
+        }
+
+    } catch (error) {
+        console.error('Error bulk deleting inventory items:', error);
+        showNotification('Error deleting inventory items', 'danger');
+    }
+}
+
+async function deleteInventoryItem(id) {
+    if (!confirm('Are you sure you want to delete this inventory item? This action cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/inventory/${id}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            showNotification('Inventory item deleted successfully', 'success');
+            await loadInventoryData(); // Refresh the inventory table
+        } else {
+            showNotification(`Error: ${result.message}`, 'danger');
+        }
+        
+    } catch (error) {
+        console.error('Error deleting inventory item:', error);
+        showNotification('Error deleting inventory item', 'danger');
     }
 }
 
@@ -1244,27 +1376,22 @@ function editInventoryItem(id) {
     showNotification('Edit functionality coming soon', 'info');
 }
 
-async function deleteInventoryItem(id) {
-    if (!confirm('Are you sure you want to delete this inventory item? This action cannot be undone.')) {
-        return;
+// Event listeners
+document.addEventListener('DOMContentLoaded', function () {
+    // Bind scan button
+    const scanBtn = document.getElementById('scan-btn');
+    if (scanBtn) {
+        scanBtn.addEventListener('click', startNetworkScan);
     }
-    
-    try {
-        const response = await fetch(`/api/inventory/${id}`, {
-            method: 'DELETE'
-        });
-        
-        const result = await response.json();
-        
-        if (result.status === 'success') {
-            showNotification('Inventory item deleted successfully', 'success');
-            await loadInventoryData(); // Refresh the inventory table
+});
+
+// Auto-refresh every 30 seconds
+setInterval(() => {
+    if (!scanInProgress) {
+        if (window.location.pathname.includes('scanning')) {
+            loadScanningData();
         } else {
-            showNotification(`Error: ${result.message}`, 'danger');
+            loadDashboardData();
         }
-        
-    } catch (error) {
-        console.error('Error deleting inventory item:', error);
-        showNotification('Error deleting inventory item', 'danger');
     }
-}
+}, 30000);
