@@ -425,9 +425,7 @@ def bulk_add_to_inventory():
     try:
         data = request.get_json()
         device_ids = data.get('device_ids', [])
-        common_data = data.get('common_data', {})
-        use_auto_names = data.get('use_auto_names', True)
-        device_names = data.get('device_names', {})  # Individual device names
+        mode = data.get('mode', 'common')
         
         if not device_ids:
             return jsonify({'status': 'error', 'message': 'No devices specified'}), 400
@@ -453,35 +451,79 @@ def bulk_add_to_inventory():
         added_count = 0
         skipped_count = 0
         
-        for device in devices:
-            if device['id'] in existing_ids:
-                skipped_count += 1
-                continue
+        if mode == 'common':
+            # Common mode - same settings for all devices
+            common_data = data.get('common_data', {})
+            use_auto_names = data.get('use_auto_names', True)
             
-            # Determine device name
-            if use_auto_names:
-                # Auto-generate name using hostname or IP
-                if device['hostname'] and device['hostname'] != 'Unknown':
-                    device_name = device['hostname']
+            for device in devices:
+                if device['id'] in existing_ids:
+                    skipped_count += 1
+                    continue
+                
+                # Determine device name
+                if use_auto_names:
+                    if device['hostname'] and device['hostname'] != 'Unknown':
+                        device_name = device['hostname']
+                    else:
+                        device_name = f"Device {device['ip_address']}"
                 else:
                     device_name = f"Device {device['ip_address']}"
-            else:
-                # Use individually specified name
-                device_name = device_names.get(str(device['id']), f"Device {device['ip_address']}")
+                
+                # Insert into inventory
+                conn.execute('''
+                    INSERT INTO inventory (device_id, name, category, brand, model, purchase_date, 
+                                         warranty_expiry, store_vendor, price, serial_number, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    device['id'],
+                    device_name,
+                    common_data.get('category'),
+                    common_data.get('brand'),
+                    common_data.get('model'),
+                    common_data.get('purchase_date') or None,
+                    common_data.get('warranty_expiry') or None,
+                    common_data.get('store_vendor'),
+                    float(common_data.get('price')) if common_data.get('price') else None,
+                    common_data.get('serial_number'),
+                    common_data.get('notes')
+                ))
+                added_count += 1
+                
+        else:
+            # Individual mode - unique settings for each device
+            device_data = data.get('device_data', {})
             
-            # Insert into inventory
-            conn.execute('''
-                INSERT INTO inventory (device_id, name, category, brand, purchase_date, notes)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (
-                device['id'],
-                device_name,
-                common_data.get('category'),
-                common_data.get('brand'),
-                common_data.get('purchase_date') or None,
-                common_data.get('notes')
-            ))
-            added_count += 1
+            for device in devices:
+                if device['id'] in existing_ids:
+                    skipped_count += 1
+                    continue
+                
+                device_id_str = str(device['id'])
+                individual_data = device_data.get(device_id_str, {})
+                
+                # Use provided name or generate fallback
+                device_name = individual_data.get('name') or f"Device {device['ip_address']}"
+                
+                # Insert into inventory with individual data
+                conn.execute('''
+                    INSERT INTO inventory (device_id, name, category, brand, model, purchase_date, 
+                                         warranty_expiry, store_vendor, price, serial_number, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    device['id'],
+                    device_name,
+                    individual_data.get('category'),
+                    individual_data.get('brand'),
+                    individual_data.get('model'),
+                    individual_data.get('purchase_date') or None,
+                    individual_data.get('warranty_expiry') or None,
+                    individual_data.get('store_vendor'),
+                    float(individual_data.get('price')) if individual_data.get('price') else None,
+                    individual_data.get('serial_number'),
+                    individual_data.get('notes')
+                ))
+                added_count += 1
         
         conn.commit()
         conn.close()

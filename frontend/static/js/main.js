@@ -199,11 +199,6 @@ async function loadRecentDevices() {
         currentDevices = devices;
         currentInventory = inventory; // Make sure we update the global inventory state
         
-        // Create set of device IDs already in inventory
-        const inventoryDeviceIds = new Set(
-            inventory.map(item => item.device_id).filter(id => id !== null)
-        );
-        
         const tbody = document.getElementById('devices-table');
         if (!tbody) return;
 
@@ -426,14 +421,13 @@ function updateBulkActionsBar() {
     );
     
     const hasUnmanaged = selectedDeviceData.some(d => !inventoryDeviceIds.has(d.id) && !d.is_ignored);
-    const hasManaged = selectedDeviceData.some(d => inventoryDeviceIds.has(d.id));
     const hasNonIgnored = selectedDeviceData.some(d => !d.is_ignored);
     const hasIgnored = selectedDeviceData.some(d => d.is_ignored);
     
     // Show/hide buttons based on selection
-    bulkAddBtn.style.display = hasUnmanaged ? 'inline-block' : 'none';
-    bulkIgnoreBtn.style.display = hasNonIgnored ? 'inline-block' : 'none';
-    bulkUnignoreBtn.style.display = hasIgnored ? 'inline-block' : 'none';
+    if (bulkAddBtn) bulkAddBtn.style.display = hasUnmanaged ? 'inline-block' : 'none';
+    if (bulkIgnoreBtn) bulkIgnoreBtn.style.display = hasNonIgnored ? 'inline-block' : 'none';
+    if (bulkUnignoreBtn) bulkUnignoreBtn.style.display = hasIgnored ? 'inline-block' : 'none';
 }
 
 function clearSelection() {
@@ -474,27 +468,46 @@ async function bulkAddToInventory() {
         currentDevices.find(d => d.id === id)
     );
     
-    // Populate individual devices list
-    populateIndividualDevicesList();
+    // Reset to common mode
+    document.getElementById('commonMode').checked = true;
+    toggleConfigMode();
     
     const modal = new bootstrap.Modal(document.getElementById('bulkAddToInventoryModal'));
     modal.show();
 }
 
+function toggleConfigMode() {
+    const isCommonMode = document.getElementById('commonMode').checked;
+    const infoDiv = document.getElementById('config-mode-info');
+    const commonSection = document.getElementById('common-settings-section');
+    const individualSection = document.getElementById('individual-settings-section');
+    
+    if (isCommonMode) {
+        infoDiv.className = 'alert alert-primary';
+        infoDiv.innerHTML = `
+            <small>
+                <i class="fas fa-layer-group me-1"></i>
+                <strong>Common Settings Mode:</strong> Apply the same configuration to all selected devices quickly.
+            </small>
+        `;
+        commonSection.style.display = 'block';
+        individualSection.style.display = 'none';
+    } else {
+        infoDiv.className = 'alert alert-success';
+        infoDiv.innerHTML = `
+            <small>
+                <i class="fas fa-edit me-1"></i>
+                <strong>Individual Settings Mode:</strong> Customize each device with unique settings and details.
+            </small>
+        `;
+        commonSection.style.display = 'none';
+        individualSection.style.display = 'block';
+        populateIndividualDevicesList();
+    }
+}
+
 function populateIndividualDevicesList() {
     const container = document.getElementById('individual-devices-list');
-    const useAutoNames = document.getElementById('useDeviceNames').checked;
-    
-    if (useAutoNames) {
-        container.innerHTML = `
-            <div class="text-muted text-center py-3">
-                <i class="fas fa-magic fa-2x mb-2"></i>
-                <div>Device names will be generated automatically</div>
-                <small>Toggle off "Auto-generate names" to customize individual names</small>
-            </div>
-        `;
-        return;
-    }
     
     container.innerHTML = window.bulkEligibleDevices.map((device, index) => {
         const suggestedName = device.hostname && device.hostname !== 'Unknown' 
@@ -502,14 +515,14 @@ function populateIndividualDevicesList() {
             : `Device ${device.ip_address}`;
             
         return `
-            <div class="row align-items-center mb-3 p-2 border rounded">
-                <div class="col-md-4">
+            <div class="card mb-3 device-config-card" data-device-id="${device.id}">
+                <div class="card-header">
                     <div class="d-flex align-items-center">
                         <div class="device-icon bg-light me-2">
                             <i class="fas fa-desktop"></i>
                         </div>
                         <div>
-                            <div class="fw-bold">${device.ip_address}</div>
+                            <h6 class="mb-0">${device.ip_address}</h6>
                             <small class="text-muted">
                                 ${device.vendor || 'Unknown vendor'} • 
                                 <code>${device.mac_address}</code>
@@ -517,45 +530,122 @@ function populateIndividualDevicesList() {
                         </div>
                     </div>
                 </div>
-                <div class="col-md-8">
-                    <input type="text" 
-                           class="form-control device-name-input" 
-                           data-device-id="${device.id}"
-                           value="${suggestedName}" 
-                           placeholder="Enter device name"
-                           required>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Device Name *</label>
+                            <input type="text" 
+                                   class="form-control device-field" 
+                                   data-field="name"
+                                   value="${suggestedName}" 
+                                   required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Category</label>
+                            <select class="form-select device-field" data-field="category">
+                                <option value="">Select category...</option>
+                                <option value="Router">Router</option>
+                                <option value="Switch">Switch</option>
+                                <option value="Access Point">Access Point</option>
+                                <option value="Smart Home">Smart Home Device</option>
+                                <option value="Computer">Computer</option>
+                                <option value="Mobile">Mobile Device</option>
+                                <option value="IoT">IoT Device</option>
+                                <option value="Appliance">Appliance</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Brand</label>
+                            <input type="text" class="form-control device-field" data-field="brand">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Model</label>
+                            <input type="text" class="form-control device-field" data-field="model">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Serial Number</label>
+                            <input type="text" class="form-control device-field" data-field="serial_number">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Purchase Date</label>
+                            <input type="date" class="form-control device-field" data-field="purchase_date">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Warranty Expiry</label>
+                            <input type="date" class="form-control device-field" data-field="warranty_expiry">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Price</label>
+                            <input type="number" step="0.01" class="form-control device-field" data-field="price" placeholder="0.00">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Store/Vendor</label>
+                            <input type="text" class="form-control device-field" data-field="store_vendor">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control device-field" data-field="notes" rows="2"></textarea>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
     }).join('');
 }
 
-function toggleNamingMode() {
-    const useAutoNames = document.getElementById('useDeviceNames').checked;
-    const infoDiv = document.getElementById('naming-mode-info');
+function copyCommonToAll() {
+    const commonForm = document.getElementById('bulkInventoryForm');
+    const formData = new FormData(commonForm);
     
-    if (useAutoNames) {
-        infoDiv.className = 'alert alert-success mb-3';
-        infoDiv.innerHTML = `
-            <small>
-                <i class="fas fa-magic me-1"></i>
-                <strong>Auto-generate mode:</strong> Device names will be automatically generated using hostnames when available, or "Device [IP]" as fallback.
-            </small>
-        `;
-    } else {
-        infoDiv.className = 'alert alert-warning mb-3';
-        infoDiv.innerHTML = `
-            <small>
-                <i class="fas fa-edit me-1"></i>
-                <strong>Manual mode:</strong> You can customize the name for each device below.
-            </small>
-        `;
-    }
+    // Get common values
+    const commonValues = {
+        category: formData.get('category'),
+        brand: formData.get('brand'),
+        model: formData.get('model'),
+        purchase_date: formData.get('purchase_date'),
+        warranty_expiry: formData.get('warranty_expiry'),
+        store_vendor: formData.get('store_vendor'),
+        price: formData.get('price'),
+        serial_number: formData.get('serial_number'),
+        notes: formData.get('notes')
+    };
     
-    populateIndividualDevicesList();
+    // Apply to all individual device forms
+    document.querySelectorAll('.device-config-card').forEach(card => {
+        Object.keys(commonValues).forEach(field => {
+            if (field !== 'serial_number' || !commonValues[field]) { // Don't copy serial number if it's set
+                const input = card.querySelector(`[data-field="${field}"]`);
+                if (input && commonValues[field]) {
+                    input.value = commonValues[field];
+                }
+            }
+        });
+    });
+    
+    showNotification('Common settings copied to all devices', 'success');
 }
 
 async function saveBulkToInventory() {
+    const isCommonMode = document.getElementById('commonMode').checked;
+    
+    if (isCommonMode) {
+        return saveBulkToInventoryCommon();
+    } else {
+        return saveBulkToInventoryIndividual();
+    }
+}
+
+async function saveBulkToInventoryCommon() {
     const form = document.getElementById('bulkInventoryForm');
     const formData = new FormData(form);
     const useAutoNames = document.getElementById('useDeviceNames').checked;
@@ -563,34 +653,14 @@ async function saveBulkToInventory() {
     const commonData = {
         category: formData.get('category'),
         brand: formData.get('brand'),
+        model: formData.get('model'),
         purchase_date: formData.get('purchase_date'),
+        warranty_expiry: formData.get('warranty_expiry'),
+        store_vendor: formData.get('store_vendor'),
+        price: formData.get('price'),
+        serial_number: formData.get('serial_number'),
         notes: formData.get('notes')
     };
-    
-    // Collect individual device names if manual mode
-    let deviceNames = {};
-    if (!useAutoNames) {
-        const nameInputs = document.querySelectorAll('.device-name-input');
-        let hasEmptyNames = false;
-        
-        nameInputs.forEach(input => {
-            const deviceId = parseInt(input.dataset.deviceId);
-            const name = input.value.trim();
-            
-            if (!name) {
-                hasEmptyNames = true;
-                input.classList.add('is-invalid');
-            } else {
-                input.classList.remove('is-invalid');
-                deviceNames[deviceId] = name;
-            }
-        });
-        
-        if (hasEmptyNames) {
-            showNotification('Please provide names for all devices', 'warning');
-            return;
-        }
-    }
     
     try {
         const response = await fetch('/api/devices/bulk/add-to-inventory', {
@@ -602,36 +672,95 @@ async function saveBulkToInventory() {
                 device_ids: window.bulkEligibleDeviceIds,
                 common_data: commonData,
                 use_auto_names: useAutoNames,
-                device_names: deviceNames
+                mode: 'common'
             })
         });
 
         const result = await response.json();
-
-        if (result.status === 'success') {
-            showNotification(result.message, 'success');
-
-            // Close modal and refresh data
-            const modal = bootstrap.Modal.getInstance(document.getElementById('bulkAddToInventoryModal'));
-            modal.hide();
-            form.reset();
-            
-            clearSelection();
-            
-            await Promise.all([
-                loadScanningData(),
-                fetch('/api/inventory').then(res => res.json()).then(inventory => {
-                    currentInventory = inventory;
-                    return loadRecentDevices();
-                })
-            ]);
-        } else {
-            showNotification(`Error: ${result.message}`, 'danger');
-        }
+        await handleBulkInventoryResult(result);
 
     } catch (error) {
         console.error('Error bulk adding to inventory:', error);
         showNotification('Error adding devices to inventory', 'danger');
+    }
+}
+
+async function saveBulkToInventoryIndividual() {
+    // Collect individual device data
+    const deviceData = {};
+    let hasErrors = false;
+    
+    document.querySelectorAll('.device-config-card').forEach(card => {
+        const deviceId = card.dataset.deviceId;
+        const data = {};
+        
+        card.querySelectorAll('.device-field').forEach(field => {
+            const fieldName = field.dataset.field;
+            const value = field.value.trim();
+            
+            // Validate required fields
+            if (fieldName === 'name' && !value) {
+                field.classList.add('is-invalid');
+                hasErrors = true;
+            } else {
+                field.classList.remove('is-invalid');
+                data[fieldName] = value || null;
+            }
+        });
+        
+        deviceData[deviceId] = data;
+    });
+    
+    if (hasErrors) {
+        showNotification('Please provide names for all devices', 'warning');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/devices/bulk/add-to-inventory', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                device_ids: window.bulkEligibleDeviceIds,
+                device_data: deviceData,
+                mode: 'individual'
+            })
+        });
+
+        const result = await response.json();
+        await handleBulkInventoryResult(result);
+
+    } catch (error) {
+        console.error('Error bulk adding to inventory:', error);
+        showNotification('Error adding devices to inventory', 'danger');
+    }
+}
+
+async function handleBulkInventoryResult(result) {
+    if (result.status === 'success') {
+        showNotification(result.message, 'success');
+
+        // Close modal and refresh data
+        const modal = bootstrap.Modal.getInstance(document.getElementById('bulkAddToInventoryModal'));
+        modal.hide();
+        
+        // Reset form
+        document.getElementById('bulkInventoryForm').reset();
+        document.getElementById('commonMode').checked = true;
+        
+        clearSelection();
+        
+        await Promise.all([
+            loadScanningData(),
+            fetch('/api/inventory').then(res => res.json()).then(inventory => {
+                currentInventory = inventory;
+                return loadRecentDevices();
+            })
+        ]);
+    } else {
+        showNotification(`Error: ${result.message}`, 'danger');
     }
 }
 
