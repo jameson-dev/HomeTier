@@ -152,18 +152,53 @@ def add_inventory():
         
         # Check if device is already in inventory (only if device_id provided)
         if data.get('device_id'):
-            existing = conn.execute('''
+            # First check for active (non-deleted) inventory items
+            existing_active = conn.execute('''
                 SELECT id FROM inventory 
                 WHERE device_id = ? AND deleted_at IS NULL
             ''', (data.get('device_id'),)).fetchone()
             
-            if existing:
+            if existing_active:
                 conn.close()
                 return jsonify({
                     'status': 'error', 
                     'message': 'This device is already in your inventory'
                 }), 400
+            
+            # Check for soft-deleted inventory items
+            existing_deleted = conn.execute('''
+                SELECT id FROM inventory 
+                WHERE device_id = ? AND deleted_at IS NOT NULL
+            ''', (data.get('device_id'),)).fetchone()
+            
+            if existing_deleted:
+                # Restore the soft-deleted item with new data
+                conn.execute('''
+                    UPDATE inventory 
+                    SET name = ?, category = ?, brand = ?, model = ?, purchase_date = ?, 
+                        warranty_expiry = ?, store_vendor = ?, price = ?, serial_number = ?, 
+                        notes = ?, deleted_at = NULL, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (
+                    data.get('name'),
+                    data.get('category'),
+                    data.get('brand'),
+                    data.get('model'),
+                    data.get('purchase_date') or None,
+                    data.get('warranty_expiry') or None,
+                    data.get('store_vendor'),
+                    data.get('price') or None,
+                    data.get('serial_number'),
+                    data.get('notes'),
+                    existing_deleted['id']
+                ))
+                
+                conn.commit()
+                conn.close()
+                
+                return jsonify({'status': 'success', 'id': existing_deleted['id'], 'action': 'restored'})
         
+        # Create new inventory item if no existing record found
         cursor = conn.execute('''
             INSERT INTO inventory (device_id, name, category, brand, model, purchase_date, 
                                  warranty_expiry, store_vendor, price, serial_number, notes)
@@ -185,14 +220,9 @@ def add_inventory():
         conn.commit()
         conn.close()
         
-        return jsonify({'status': 'success', 'id': cursor.lastrowid})
+        return jsonify({'status': 'success', 'id': cursor.lastrowid, 'action': 'created'})
         
     except Exception as e:
-        if 'UNIQUE constraint failed' in str(e):
-            return jsonify({
-                'status': 'error', 
-                'message': 'This device is already in your inventory'
-            }), 400
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/inventory/<int:inventory_id>', methods=['DELETE'])
@@ -440,15 +470,23 @@ def bulk_add_to_inventory():
             WHERE id IN ({placeholders})
         ''', device_ids).fetchall()
         
-        # Check for devices already in inventory
-        existing = conn.execute(f'''
+        # Check for devices already in active inventory
+        existing_active = conn.execute(f'''
             SELECT device_id FROM inventory 
             WHERE device_id IN ({placeholders}) AND deleted_at IS NULL
         ''', device_ids).fetchall()
         
-        existing_ids = set(row['device_id'] for row in existing)
+        # Check for devices in soft-deleted inventory
+        existing_deleted = conn.execute(f'''
+            SELECT device_id, id FROM inventory 
+            WHERE device_id IN ({placeholders}) AND deleted_at IS NOT NULL
+        ''', device_ids).fetchall()
+        
+        active_device_ids = set(row['device_id'] for row in existing_active)
+        deleted_device_map = {row['device_id']: row['id'] for row in existing_deleted}
         
         added_count = 0
+        restored_count = 0
         skipped_count = 0
         
         if mode == 'common':
@@ -457,7 +495,7 @@ def bulk_add_to_inventory():
             use_auto_names = data.get('use_auto_names', True)
             
             for device in devices:
-                if device['id'] in existing_ids:
+                if device['id'] in active_device_ids:
                     skipped_count += 1
                     continue
                 
@@ -470,32 +508,56 @@ def bulk_add_to_inventory():
                 else:
                     device_name = f"Device {device['ip_address']}"
                 
-                # Insert into inventory
-                conn.execute('''
-                    INSERT INTO inventory (device_id, name, category, brand, model, purchase_date, 
-                                         warranty_expiry, store_vendor, price, serial_number, notes)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    device['id'],
-                    device_name,
-                    common_data.get('category'),
-                    common_data.get('brand'),
-                    common_data.get('model'),
-                    common_data.get('purchase_date') or None,
-                    common_data.get('warranty_expiry') or None,
-                    common_data.get('store_vendor'),
-                    float(common_data.get('price')) if common_data.get('price') else None,
-                    common_data.get('serial_number'),
-                    common_data.get('notes')
-                ))
-                added_count += 1
+                # Check if this device was soft-deleted
+                if device['id'] in deleted_device_map:
+                    # Restore the soft-deleted item
+                    conn.execute('''
+                        UPDATE inventory 
+                        SET name = ?, category = ?, brand = ?, model = ?, purchase_date = ?, 
+                            warranty_expiry = ?, store_vendor = ?, price = ?, serial_number = ?, 
+                            notes = ?, deleted_at = NULL, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    ''', (
+                        device_name,
+                        common_data.get('category'),
+                        common_data.get('brand'),
+                        common_data.get('model'),
+                        common_data.get('purchase_date') or None,
+                        common_data.get('warranty_expiry') or None,
+                        common_data.get('store_vendor'),
+                        float(common_data.get('price')) if common_data.get('price') else None,
+                        common_data.get('serial_number'),
+                        common_data.get('notes'),
+                        deleted_device_map[device['id']]
+                    ))
+                    restored_count += 1
+                else:
+                    # Insert new inventory item
+                    conn.execute('''
+                        INSERT INTO inventory (device_id, name, category, brand, model, purchase_date, 
+                                             warranty_expiry, store_vendor, price, serial_number, notes)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        device['id'],
+                        device_name,
+                        common_data.get('category'),
+                        common_data.get('brand'),
+                        common_data.get('model'),
+                        common_data.get('purchase_date') or None,
+                        common_data.get('warranty_expiry') or None,
+                        common_data.get('store_vendor'),
+                        float(common_data.get('price')) if common_data.get('price') else None,
+                        common_data.get('serial_number'),
+                        common_data.get('notes')
+                    ))
+                    added_count += 1
                 
         else:
             # Individual mode - unique settings for each device
             device_data = data.get('device_data', {})
             
             for device in devices:
-                if device['id'] in existing_ids:
+                if device['id'] in active_device_ids:
                     skipped_count += 1
                     continue
                 
@@ -505,37 +567,72 @@ def bulk_add_to_inventory():
                 # Use provided name or generate fallback
                 device_name = individual_data.get('name') or f"Device {device['ip_address']}"
                 
-                # Insert into inventory with individual data
-                conn.execute('''
-                    INSERT INTO inventory (device_id, name, category, brand, model, purchase_date, 
-                                         warranty_expiry, store_vendor, price, serial_number, notes)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    device['id'],
-                    device_name,
-                    individual_data.get('category'),
-                    individual_data.get('brand'),
-                    individual_data.get('model'),
-                    individual_data.get('purchase_date') or None,
-                    individual_data.get('warranty_expiry') or None,
-                    individual_data.get('store_vendor'),
-                    float(individual_data.get('price')) if individual_data.get('price') else None,
-                    individual_data.get('serial_number'),
-                    individual_data.get('notes')
-                ))
-                added_count += 1
+                # Check if this device was soft-deleted
+                if device['id'] in deleted_device_map:
+                    # Restore the soft-deleted item
+                    conn.execute('''
+                        UPDATE inventory 
+                        SET name = ?, category = ?, brand = ?, model = ?, purchase_date = ?, 
+                            warranty_expiry = ?, store_vendor = ?, price = ?, serial_number = ?, 
+                            notes = ?, deleted_at = NULL, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    ''', (
+                        device_name,
+                        individual_data.get('category'),
+                        individual_data.get('brand'),
+                        individual_data.get('model'),
+                        individual_data.get('purchase_date') or None,
+                        individual_data.get('warranty_expiry') or None,
+                        individual_data.get('store_vendor'),
+                        float(individual_data.get('price')) if individual_data.get('price') else None,
+                        individual_data.get('serial_number'),
+                        individual_data.get('notes'),
+                        deleted_device_map[device['id']]
+                    ))
+                    restored_count += 1
+                else:
+                    # Insert new inventory item
+                    conn.execute('''
+                        INSERT INTO inventory (device_id, name, category, brand, model, purchase_date, 
+                                             warranty_expiry, store_vendor, price, serial_number, notes)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        device['id'],
+                        device_name,
+                        individual_data.get('category'),
+                        individual_data.get('brand'),
+                        individual_data.get('model'),
+                        individual_data.get('purchase_date') or None,
+                        individual_data.get('warranty_expiry') or None,
+                        individual_data.get('store_vendor'),
+                        float(individual_data.get('price')) if individual_data.get('price') else None,
+                        individual_data.get('serial_number'),
+                        individual_data.get('notes')
+                    ))
+                    added_count += 1
         
         conn.commit()
         conn.close()
         
-        message = f'Successfully added {added_count} device(s) to inventory'
+        # Build message based on what happened
+        message_parts = []
+        if added_count > 0:
+            message_parts.append(f'Added {added_count} new device(s)')
+        if restored_count > 0:
+            message_parts.append(f'restored {restored_count} previously deleted device(s)')
         if skipped_count > 0:
-            message += f' ({skipped_count} already in inventory)'
+            message_parts.append(f'{skipped_count} already in inventory')
+            
+        if message_parts:
+            message = 'Successfully ' + ', '.join(message_parts) + ' to inventory'
+        else:
+            message = 'No devices were processed'
         
         return jsonify({
             'status': 'success',
             'message': message,
             'added_count': added_count,
+            'restored_count': restored_count,
             'skipped_count': skipped_count
         })
         
