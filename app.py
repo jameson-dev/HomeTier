@@ -3,7 +3,7 @@ from flask import Flask, render_template, request, jsonify, make_response
 from flask_socketio import SocketIO, emit
 from backend.database import (
     init_db, get_db_connection, get_categories, add_category, 
-    update_category, delete_category
+    update_category, delete_category, add_device
 )
 from backend.scanner import NetworkScanner
 from config import Config
@@ -235,42 +235,64 @@ def handle_start_scan():
         emit('scan_error', {'message': 'Scan already in progress'})
         return
         
-    def scan_with_progress():
-        try:
-            realtime_monitor.scan_in_progress = True
-            socketio.emit('scan_started', {
-                'message': 'Network scan started', 
-                'timestamp': datetime.now().isoformat()
+def scan_with_progress():
+    try:
+        realtime_monitor.scan_in_progress = True
+        socketio.emit('scan_started', {
+            'message': 'Network scan started', 
+            'timestamp': datetime.now().isoformat()
+        })
+        
+        network_ranges = scanner.get_network_ranges()
+        all_devices = []
+        
+        for i, network_range in enumerate(network_ranges):
+            socketio.emit('scan_progress', {
+                'progress': int((i / len(network_ranges)) * 100),
+                'current_range': network_range,
+                'message': f'Scanning {network_range}...'
             })
             
-            network_ranges = scanner.get_network_ranges()
+            devices = scanner.ping_scan(network_range)
             
-            for i, network_range in enumerate(network_ranges):
-                socketio.emit('scan_progress', {
-                    'progress': int((i / len(network_ranges)) * 100),
-                    'current_range': network_range,
-                    'message': f'Scanning {network_range}...'
-                })
-                
-                devices = scanner.ping_scan(network_range)
-                
-                if devices:
-                    socketio.emit('scan_devices_found', {
-                        'devices': devices,
-                        'range': network_range,
-                        'count': len(devices)
+            # Process and save each discovered device
+            for device in devices:
+                if device['mac']:
+                    # Save device to database and get ID
+                    device_id = add_device(
+                        mac_address=device['mac'],
+                        ip_address=device['ip'],
+                        hostname=device['hostname'],
+                        vendor=device['vendor']
+                    )
+                    device['id'] = device_id
+                    all_devices.append(device)
+                    
+                    # Emit individual device discovery
+                    socketio.emit('device_discovered', {
+                        'device': device,
+                        'total_found': len(all_devices)
                     })
             
-            socketio.emit('scan_completed', {
-                'message': 'Network scan completed',
-                'timestamp': datetime.now().isoformat(),
-                'total_ranges': len(network_ranges)
-            })
-            
-        except Exception as e:
-            socketio.emit('scan_error', {'message': f'Scan failed: {str(e)}'})
-        finally:
-            realtime_monitor.scan_in_progress = False
+            if devices:
+                socketio.emit('scan_devices_found', {
+                    'devices': devices,
+                    'range': network_range,
+                    'count': len(devices)
+                })
+        
+        socketio.emit('scan_completed', {
+            'message': f'Network scan completed! Found {len(all_devices)} devices.',
+            'devices_found': len(all_devices),
+            'timestamp': datetime.now().isoformat(),
+            'total_ranges': len(network_ranges)
+        })
+        
+    except Exception as e:
+        print(f"Scan error: {e}")  # Also log to console for debugging
+        socketio.emit('scan_error', {'message': f'Scan failed: {str(e)}'})
+    finally:
+        realtime_monitor.scan_in_progress = False
             
     scan_thread = threading.Thread(target=scan_with_progress)
     scan_thread.start()
@@ -910,7 +932,7 @@ def trigger_scan():
                         # Emit each discovered device immediately
                         for device in devices:
                             if device['mac']:
-                                device_id = scanner.add_device(
+                                device_id = add_device(
                                     mac_address=device['mac'],
                                     ip_address=device['ip'],
                                     hostname=device['hostname'],
