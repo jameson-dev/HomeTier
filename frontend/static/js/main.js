@@ -530,7 +530,7 @@ function clearSelection() {
     updateSelectAllCheckbox();
 }
 
-// Enhanced bulk operation functions with category support
+// Bulk operation functions with category support
 async function bulkAddToInventory() {
     if (selectedDevices.size === 0) {
         showNotification('No devices selected', 'warning');
@@ -981,18 +981,23 @@ async function bulkUnignoreDevices() {
     }
 }
 
+// Network Scanning
 async function startNetworkScan() {
     if (scanInProgress) return;
 
     scanInProgress = true;
     const scanBtn = document.getElementById('scan-btn');
+    const dashboardScanBtn = document.getElementById('dashboard-scan-btn');
     const scanProgress = document.getElementById('scan-progress');
 
-    // Update UI
-    if (scanBtn) {
-        scanBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Scanning...';
-        scanBtn.disabled = true;
-    }
+    // Update UI for all scan buttons
+    [scanBtn, dashboardScanBtn].forEach(btn => {
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Scanning...';
+            btn.disabled = true;
+        }
+    });
+
     if (scanProgress) {
         scanProgress.style.display = 'block';
     }
@@ -1019,6 +1024,10 @@ async function startNetworkScan() {
                 await loadRecentDevices();
             } else {
                 await loadDashboardData();
+                // Also refresh chart data if on dashboard
+                if (typeof loadChartData !== 'undefined') {
+                    await loadChartData();
+                }
             }
         } else {
             showNotification(`Scan failed: ${result.message}`, 'danger');
@@ -1028,19 +1037,22 @@ async function startNetworkScan() {
         console.error('Error during scan:', error);
         showNotification('Error during network scan', 'danger');
     } finally {
-        // Reset UI
+        // Reset UI for all scan buttons
         scanInProgress = false;
-        if (scanBtn) {
-            scanBtn.innerHTML = '<i class="fas fa-search me-2"></i>Start Manual Scan';
-            scanBtn.disabled = false;
-        }
+        [scanBtn, dashboardScanBtn].forEach(btn => {
+            if (btn) {
+                btn.innerHTML = '<i class="fas fa-search me-2"></i>Start Manual Scan';
+                btn.disabled = false;
+            }
+        });
+        
         if (scanProgress) {
             scanProgress.style.display = 'none';
         }
     }
 }
 
-// Enhanced individual device management functions with category support
+// Individual device management functions with category support
 function addToInventory(deviceId) {
     const device = currentDevices.find(d => d.id === deviceId);
     if (!device) return;
@@ -1199,7 +1211,7 @@ async function unignoreDevice(deviceId) {
     }
 }
 
-// Enhanced inventory-specific functions with category support
+// Inventory-specific functions with category support
 async function loadInventoryData() {
     try {
         const response = await fetch('/api/inventory');
