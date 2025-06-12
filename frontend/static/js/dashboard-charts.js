@@ -1,0 +1,560 @@
+// Dashboard Charts JavaScript Functions
+
+// Chart configurations and instances
+const chartConfigs = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: {
+            display: true,
+            position: 'bottom'
+        }
+    }
+};
+
+// Initialize all charts
+function initializeCharts() {
+    initDeviceStatusChart();
+    initCategoryChart();
+    initDiscoveryTimelineChart();
+    initWarrantyChart();
+    initInventoryValueChart();
+}
+
+// Device Status Donut Chart
+function initDeviceStatusChart() {
+    const ctx = document.getElementById('deviceStatusChart').getContext('2d');
+    
+    deviceStatusChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Online', 'Offline', 'Unknown'],
+            datasets: [{
+                data: [0, 0, 0],
+                backgroundColor: [
+                    '#28a745', // Green for online
+                    '#dc3545', // Red for offline
+                    '#ffc107'  // Yellow for unknown
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            ...chartConfigs,
+            cutout: '60%',
+            plugins: {
+                legend: {
+                    display: false // We have custom legend below
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label;
+                            const value = context.parsed;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            },
+            onClick: (event, elements) => {
+                if (elements.length > 0) {
+                    const index = elements[0].index;
+                    const status = ['online', 'offline', 'unknown'][index];
+                    filterDevicesByStatus(status);
+                }
+            }
+        }
+    });
+}
+
+// Category Distribution Pie Chart
+function initCategoryChart() {
+    const ctx = document.getElementById('categoryChart').getContext('2d');
+    
+    categoryChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: [],
+            datasets: [{
+                data: [],
+                backgroundColor: [],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            ...chartConfigs,
+            plugins: {
+                legend: {
+                    display: false // We'll create a custom legend
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label;
+                            const value = context.parsed;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                            return `${label}: ${value} devices (${percentage}%)`;
+                        }
+                    }
+                }
+            },
+            onClick: (event, elements) => {
+                if (elements.length > 0) {
+                    const index = elements[0].index;
+                    const category = categoryChart.data.labels[index];
+                    filterInventoryByCategory(category);
+                }
+            }
+        }
+    });
+}
+
+// Discovery Timeline Chart
+function initDiscoveryTimelineChart() {
+    const ctx = document.getElementById('discoveryTimelineChart').getContext('2d');
+    
+    discoveryTimelineChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'New Devices',
+                data: [],
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            ...chartConfigs,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+// Warranty Status Chart
+function initWarrantyChart() {
+    const ctx = document.getElementById('warrantyChart').getContext('2d');
+    
+    warrantyChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Active', 'Expiring Soon', 'Expired', 'Unknown'],
+            datasets: [{
+                data: [0, 0, 0, 0],
+                backgroundColor: [
+                    '#28a745', // Green for active
+                    '#ffc107', // Yellow for expiring
+                    '#dc3545', // Red for expired
+                    '#6c757d'  // Gray for unknown
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            ...chartConfigs,
+            cutout: '50%',
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'bottom',
+                    labels: {
+                        fontSize: 10,
+                        usePointStyle: true
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Inventory Value Gauge Chart
+function initInventoryValueChart() {
+    const ctx = document.getElementById('inventoryValueChart').getContext('2d');
+    
+    inventoryValueChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: [],
+            datasets: [{
+                data: [],
+                backgroundColor: [],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            ...chartConfigs,
+            cutout: '70%',
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+// Load and update chart data
+async function loadChartData() {
+    try {
+        const [devicesResponse, inventoryResponse, statsResponse] = await Promise.all([
+            fetch('/api/devices'),
+            fetch('/api/inventory'),
+            fetch('/api/dashboard/stats')
+        ]);
+        
+        const devices = await devicesResponse.json();
+        const inventory = await inventoryResponse.json();
+        const stats = await statsResponse.json();
+        
+        updateDeviceStatusChart(devices);
+        updateCategoryChart(stats.category_stats);
+        updateDiscoveryTimeline(7); // Default to 7 days
+        updateWarrantyChart(inventory);
+        updateInventoryValueChart(inventory);
+        updateRecentActivity(devices, inventory);
+        
+    } catch (error) {
+        console.error('Error loading chart data:', error);
+    }
+}
+
+// Update Device Status Chart
+function updateDeviceStatusChart(devices) {
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    let online = 0, offline = 0, unknown = 0;
+    
+    devices.forEach(device => {
+        const lastSeen = new Date(device.last_seen);
+        
+        if (lastSeen > oneHourAgo) {
+            online++;
+        } else if (lastSeen > oneDayAgo) {
+            unknown++;
+        } else {
+            offline++;
+        }
+    });
+    
+    deviceStatusChart.data.datasets[0].data = [online, offline, unknown];
+    deviceStatusChart.update();
+    
+    // Update status counts
+    document.getElementById('online-count').textContent = online;
+    document.getElementById('offline-count').textContent = offline;
+    document.getElementById('unknown-count').textContent = unknown;
+}
+
+// Update Category Chart
+function updateCategoryChart(categoryStats) {
+    if (!categoryStats || categoryStats.length === 0) {
+        categoryChart.data.labels = ['No Data'];
+        categoryChart.data.datasets[0].data = [1];
+        categoryChart.data.datasets[0].backgroundColor = ['#e9ecef'];
+        categoryChart.update();
+        return;
+    }
+    
+    const labels = categoryStats.map(stat => stat.category);
+    const data = categoryStats.map(stat => stat.count);
+    const colors = categoryStats.map(stat => stat.color || '#6c757d');
+    
+    categoryChart.data.labels = labels;
+    categoryChart.data.datasets[0].data = data;
+    categoryChart.data.datasets[0].backgroundColor = colors;
+    categoryChart.update();
+    
+    // Create custom legend
+    createCategoryLegend(categoryStats);
+}
+
+// Create custom category legend
+function createCategoryLegend(categoryStats) {
+    const legendContainer = document.getElementById('category-legend');
+    
+    legendContainer.innerHTML = categoryStats.map(stat => `
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <div class="d-flex align-items-center">
+                <div class="category-icon me-2" style="background-color: ${stat.color}; color: white; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.6rem;">
+                    <i class="${stat.icon}"></i>
+                </div>
+                <small>${stat.category}</small>
+            </div>
+            <small class="fw-bold">${stat.count}</small>
+        </div>
+    `).join('');
+}
+
+// Update Discovery Timeline
+async function updateDiscoveryTimeline(days = 7) {
+    try {
+        const response = await fetch(`/api/devices/timeline?days=${days}`);
+        const timelineData = await response.json();
+        
+        if (timelineData.status === 'success') {
+            const labels = timelineData.timeline.map(point => {
+                const date = new Date(point.date);
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            });
+            const data = timelineData.timeline.map(point => point.count);
+            
+            discoveryTimelineChart.data.labels = labels;
+            discoveryTimelineChart.data.datasets[0].data = data;
+            discoveryTimelineChart.update();
+        }
+    } catch (error) {
+        console.error('Error loading timeline data:', error);
+        // Fallback to empty chart
+        discoveryTimelineChart.data.labels = [];
+        discoveryTimelineChart.data.datasets[0].data = [];
+        discoveryTimelineChart.update();
+    }
+}
+
+// Update Warranty Chart
+function updateWarrantyChart(inventory) {
+    const now = new Date();
+    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    
+    let active = 0, expiring = 0, expired = 0, unknown = 0;
+    
+    inventory.forEach(item => {
+        if (!item.warranty_expiry) {
+            unknown++;
+        } else {
+            const warrantyDate = new Date(item.warranty_expiry);
+            
+            if (warrantyDate < now) {
+                expired++;
+            } else if (warrantyDate <= thirtyDaysFromNow) {
+                expiring++;
+            } else {
+                active++;
+            }
+        }
+    });
+    
+    warrantyChart.data.datasets[0].data = [active, expiring, expired, unknown];
+    warrantyChart.update();
+}
+
+// Update Inventory Value Chart
+function updateInventoryValueChart(inventory) {
+    const categoryValues = {};
+    let totalValue = 0;
+    
+    inventory.forEach(item => {
+        const price = parseFloat(item.price) || 0;
+        const category = item.category_name || item.category || 'Unknown';
+        
+        categoryValues[category] = (categoryValues[category] || 0) + price;
+        totalValue += price;
+    });
+    
+    const sortedCategories = Object.entries(categoryValues)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5); // Top 5 categories
+    
+    if (sortedCategories.length > 0) {
+        const labels = sortedCategories.map(([category]) => category);
+        const data = sortedCategories.map(([, value]) => value);
+        const colors = ['#007bff', '#28a745', '#ffc107', '#dc3545', '#6c757d'];
+        
+        inventoryValueChart.data.labels = labels;
+        inventoryValueChart.data.datasets[0].data = data;
+        inventoryValueChart.data.datasets[0].backgroundColor = colors.slice(0, labels.length);
+        inventoryValueChart.update();
+        
+        // Update value statistics
+        document.getElementById('total-value').textContent = `$${totalValue.toLocaleString()}`;
+        document.getElementById('average-value').textContent = `$${Math.round(totalValue / inventory.length || 0).toLocaleString()}`;
+        document.getElementById('top-category').textContent = sortedCategories[0]?.[0] || 'None';
+    }
+}
+
+// Update Recent Activity Feed
+function updateRecentActivity(devices, inventory) {
+    const activityContainer = document.getElementById('recent-activity');
+    
+    // Get recent devices (last 7 days)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentDevices = devices
+        .filter(device => new Date(device.first_seen) > sevenDaysAgo)
+        .sort((a, b) => new Date(b.first_seen) - new Date(a.first_seen))
+        .slice(0, 10);
+    
+    // Get recent inventory additions (last 7 days)
+    const recentInventory = inventory
+        .filter(item => new Date(item.created_at) > sevenDaysAgo)
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, 5);
+    
+    const activities = [];
+    
+    // Add device discoveries
+    recentDevices.forEach(device => {
+        activities.push({
+            type: 'device_discovered',
+            date: new Date(device.first_seen),
+            content: `
+                <div class="d-flex align-items-center">
+                    <div class="bg-primary text-white rounded-circle me-3 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                        <i class="fas fa-wifi fa-sm"></i>
+                    </div>
+                    <div>
+                        <strong>Device Discovered</strong>
+                        <br><small class="text-muted">${device.hostname || device.ip_address} (${device.vendor || 'Unknown vendor'})</small>
+                    </div>
+                </div>
+            `
+        });
+    });
+    
+    // Add inventory additions
+    recentInventory.forEach(item => {
+        activities.push({
+            type: 'inventory_added',
+            date: new Date(item.created_at),
+            content: `
+                <div class="d-flex align-items-center">
+                    <div class="bg-success text-white rounded-circle me-3 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                        <i class="fas fa-plus fa-sm"></i>
+                    </div>
+                    <div>
+                        <strong>Added to Inventory</strong>
+                        <br><small class="text-muted">${item.name} (${item.category_name || item.category || 'Uncategorized'})</small>
+                    </div>
+                </div>
+            `
+        });
+    });
+    
+    // Sort all activities by date
+    activities.sort((a, b) => b.date - a.date);
+    
+    if (activities.length === 0) {
+        activityContainer.innerHTML = `
+            <div class="text-center text-muted">
+                <i class="fas fa-history fa-2x mb-2"></i>
+                <p>No recent activity</p>
+                <small>Scan your network to discover devices</small>
+            </div>
+        `;
+        return;
+    }
+    
+    activityContainer.innerHTML = activities.slice(0, 8).map(activity => `
+        <div class="mb-3 pb-2 border-bottom">
+            ${activity.content}
+            <div class="mt-1">
+                <small class="text-muted">${formatRelativeTime(activity.date)}</small>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Utility function to format relative time
+function formatRelativeTime(date) {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+    
+    return date.toLocaleDateString();
+}
+
+// Filter functions for chart interactivity
+function filterDevicesByStatus(status) {
+    // Navigate to scanning page with status filter
+    window.location.href = `/scanning?filter=${status}`;
+}
+
+function filterInventoryByCategory(category = null) {
+    // Navigate to inventory page with category filter
+    const url = category ? `/inventory?category=${encodeURIComponent(category)}` : '/inventory';
+    window.location.href = url;
+}
+
+// Enhanced loadDashboardData function with chart integration
+async function loadDashboardData() {
+    try {
+        const [devicesResponse, inventoryResponse] = await Promise.all([
+            fetch('/api/devices'),
+            fetch('/api/inventory')
+        ]);
+        
+        const devices = await devicesResponse.json();
+        const inventory = await inventoryResponse.json();
+
+        const activeDevices = devices.filter(d =>
+            new Date() - new Date(d.last_seen) < 3600000 // Last hour
+        ).length;
+
+        const newDevices = devices.filter(d =>
+            new Date() - new Date(d.first_seen) < 3600000 // Last hour
+        ).length;
+
+        // Safely update elements if they exist
+        const activeCount = document.getElementById('active-devices-count');
+        if (activeCount) activeCount.textContent = activeDevices;
+
+        const newCount = document.getElementById('new-devices-count');
+        if (newCount) newCount.textContent = newDevices;
+
+        const inventoryCount = document.getElementById('inventory-count');
+        if (inventoryCount) inventoryCount.textContent = inventory.length;
+
+        // Update last scan time
+        if (devices.length > 0) {
+            const lastScan = Math.max(...devices.map(d => new Date(d.last_seen)));
+            const lastScanTime = document.getElementById('last-scan-time');
+            if (lastScanTime) lastScanTime.textContent = formatDateTime(lastScan);
+        }
+
+        // Update charts if they exist
+        if (typeof updateDeviceStatusChart !== 'undefined') {
+            updateDeviceStatusChart(devices);
+        }
+        if (typeof updateWarrantyChart !== 'undefined') {
+            updateWarrantyChart(inventory);
+        }
+        if (typeof updateRecentActivity !== 'undefined') {
+            updateRecentActivity(devices, inventory);
+        }
+
+    } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        showNotification('Error loading dashboard data', 'danger');
+    }
+}

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 </head>
+
 <body>
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
@@ -27,7 +29,8 @@
                         </a>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="inventoryDropdown" role="button" data-bs-toggle="dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="inventoryDropdown" role="button"
+                            data-bs-toggle="dropdown">
                             <i class="fas fa-boxes me-1"></i>Inventory
                         </a>
                         <ul class="dropdown-menu">
@@ -41,7 +44,9 @@
                                     <i class="fas fa-search me-2"></i>Network Scanning
                                 </a>
                             </li>
-                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
                             <li>
                                 <a class="dropdown-item" href="{{ url_for('categories') }}">
                                     <i class="fas fa-tags me-2"></i>Categories
@@ -63,7 +68,7 @@
     <footer class="bg-light mt-5 py-3">
         <div class="container text-center">
             <small class="text-muted">
-                HomeTier &copy; 2025 | 
+                HomeTier &copy; 2025 |
                 <a href="https://github.com/jameson-dev/hometier" target="_blank">
                     <i class="fab fa-github"></i> GitHub
                 </a>
@@ -74,12 +79,23 @@
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    
+
+    <!-- Chart.js for dashboard charts -->
+    {% if request.endpoint == 'index' %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="{{ url_for('static', filename='js/dashboard-charts.js') }}"></script>
+    {% endif %}
+
     <!-- Categories specific scripts -->
     {% if request.endpoint == 'categories' %}
     <script src="{{ url_for('static', filename='js/categories.js') }}"></script>
     {% endif %}
-    
+
+    <!-- WebSocket for real-time features -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="{{ url_for('static', filename='js/websocket-client.js') }}"></script>
+
     {% block scripts %}{% endblock %}
 </body>
+
 </html>
