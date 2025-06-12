@@ -12,18 +12,32 @@ const chartConfigs = {
     }
 };
 
+// Chart instances
+let deviceStatusChart, categoryChart, discoveryTimelineChart, warrantyChart, inventoryValueChart;
+
 // Initialize all charts
 function initializeCharts() {
-    initDeviceStatusChart();
-    initCategoryChart();
-    initDiscoveryTimelineChart();
-    initWarrantyChart();
-    initInventoryValueChart();
+    try {
+        initDeviceStatusChart();
+        initCategoryChart();
+        initDiscoveryTimelineChart();
+        initWarrantyChart();
+        initInventoryValueChart();
+        console.log('All charts initialized successfully');
+    } catch (error) {
+        console.error('Error initializing charts:', error);
+    }
 }
 
 // Device Status Donut Chart
 function initDeviceStatusChart() {
-    const ctx = document.getElementById('deviceStatusChart').getContext('2d');
+    const canvas = document.getElementById('deviceStatusChart');
+    if (!canvas) {
+        console.warn('Device status chart canvas not found');
+        return;
+    }
+    
+    const ctx = canvas.getContext('2d');
     
     deviceStatusChart = new Chart(ctx, {
         type: 'doughnut',
@@ -72,7 +86,13 @@ function initDeviceStatusChart() {
 
 // Category Distribution Pie Chart
 function initCategoryChart() {
-    const ctx = document.getElementById('categoryChart').getContext('2d');
+    const canvas = document.getElementById('categoryChart');
+    if (!canvas) {
+        console.warn('Category chart canvas not found');
+        return;
+    }
+    
+    const ctx = canvas.getContext('2d');
     
     categoryChart = new Chart(ctx, {
         type: 'pie',
@@ -116,7 +136,13 @@ function initCategoryChart() {
 
 // Discovery Timeline Chart
 function initDiscoveryTimelineChart() {
-    const ctx = document.getElementById('discoveryTimelineChart').getContext('2d');
+    const canvas = document.getElementById('discoveryTimelineChart');
+    if (!canvas) {
+        console.warn('Discovery timeline chart canvas not found');
+        return;
+    }
+    
+    const ctx = canvas.getContext('2d');
     
     discoveryTimelineChart = new Chart(ctx, {
         type: 'line',
@@ -157,7 +183,13 @@ function initDiscoveryTimelineChart() {
 
 // Warranty Status Chart
 function initWarrantyChart() {
-    const ctx = document.getElementById('warrantyChart').getContext('2d');
+    const canvas = document.getElementById('warrantyChart');
+    if (!canvas) {
+        console.warn('Warranty chart canvas not found');
+        return;
+    }
+    
+    const ctx = canvas.getContext('2d');
     
     warrantyChart = new Chart(ctx, {
         type: 'doughnut',
@@ -194,7 +226,13 @@ function initWarrantyChart() {
 
 // Inventory Value Gauge Chart
 function initInventoryValueChart() {
-    const ctx = document.getElementById('inventoryValueChart').getContext('2d');
+    const canvas = document.getElementById('inventoryValueChart');
+    if (!canvas) {
+        console.warn('Inventory value chart canvas not found');
+        return;
+    }
+    
+    const ctx = canvas.getContext('2d');
     
     inventoryValueChart = new Chart(ctx, {
         type: 'doughnut',
@@ -213,6 +251,15 @@ function initInventoryValueChart() {
             plugins: {
                 legend: {
                     display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label;
+                            const value = context.parsed;
+                            return `${label}: $${value.toLocaleString()}`;
+                        }
+                    }
                 }
             }
         }
@@ -241,11 +288,14 @@ async function loadChartData() {
         
     } catch (error) {
         console.error('Error loading chart data:', error);
+        showNotification('Error loading chart data', 'danger');
     }
 }
 
 // Update Device Status Chart
 function updateDeviceStatusChart(devices) {
+    if (!deviceStatusChart) return;
+    
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -265,21 +315,33 @@ function updateDeviceStatusChart(devices) {
     });
     
     deviceStatusChart.data.datasets[0].data = [online, offline, unknown];
-    deviceStatusChart.update();
+    deviceStatusChart.update('none');
     
     // Update status counts
-    document.getElementById('online-count').textContent = online;
-    document.getElementById('offline-count').textContent = offline;
-    document.getElementById('unknown-count').textContent = unknown;
+    const onlineCount = document.getElementById('online-count');
+    const offlineCount = document.getElementById('offline-count');
+    const unknownCount = document.getElementById('unknown-count');
+    
+    if (onlineCount) onlineCount.textContent = online;
+    if (offlineCount) offlineCount.textContent = offline;
+    if (unknownCount) unknownCount.textContent = unknown;
 }
 
 // Update Category Chart
 function updateCategoryChart(categoryStats) {
+    if (!categoryChart) return;
+    
     if (!categoryStats || categoryStats.length === 0) {
         categoryChart.data.labels = ['No Data'];
         categoryChart.data.datasets[0].data = [1];
         categoryChart.data.datasets[0].backgroundColor = ['#e9ecef'];
-        categoryChart.update();
+        categoryChart.update('none');
+        
+        // Clear legend
+        const legendContainer = document.getElementById('category-legend');
+        if (legendContainer) {
+            legendContainer.innerHTML = '<p class="text-muted">No inventory items yet</p>';
+        }
         return;
     }
     
@@ -290,7 +352,7 @@ function updateCategoryChart(categoryStats) {
     categoryChart.data.labels = labels;
     categoryChart.data.datasets[0].data = data;
     categoryChart.data.datasets[0].backgroundColor = colors;
-    categoryChart.update();
+    categoryChart.update('none');
     
     // Create custom legend
     createCategoryLegend(categoryStats);
@@ -299,6 +361,7 @@ function updateCategoryChart(categoryStats) {
 // Create custom category legend
 function createCategoryLegend(categoryStats) {
     const legendContainer = document.getElementById('category-legend');
+    if (!legendContainer) return;
     
     legendContainer.innerHTML = categoryStats.map(stat => `
         <div class="d-flex justify-content-between align-items-center mb-1">
@@ -315,6 +378,8 @@ function createCategoryLegend(categoryStats) {
 
 // Update Discovery Timeline
 async function updateDiscoveryTimeline(days = 7) {
+    if (!discoveryTimelineChart) return;
+    
     try {
         const response = await fetch(`/api/devices/timeline?days=${days}`);
         const timelineData = await response.json();
@@ -328,19 +393,21 @@ async function updateDiscoveryTimeline(days = 7) {
             
             discoveryTimelineChart.data.labels = labels;
             discoveryTimelineChart.data.datasets[0].data = data;
-            discoveryTimelineChart.update();
+            discoveryTimelineChart.update('none');
         }
     } catch (error) {
         console.error('Error loading timeline data:', error);
         // Fallback to empty chart
         discoveryTimelineChart.data.labels = [];
         discoveryTimelineChart.data.datasets[0].data = [];
-        discoveryTimelineChart.update();
+        discoveryTimelineChart.update('none');
     }
 }
 
 // Update Warranty Chart
 function updateWarrantyChart(inventory) {
+    if (!warrantyChart) return;
+    
     const now = new Date();
     const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     
@@ -363,11 +430,13 @@ function updateWarrantyChart(inventory) {
     });
     
     warrantyChart.data.datasets[0].data = [active, expiring, expired, unknown];
-    warrantyChart.update();
+    warrantyChart.update('none');
 }
 
 // Update Inventory Value Chart
 function updateInventoryValueChart(inventory) {
+    if (!inventoryValueChart) return;
+    
     const categoryValues = {};
     let totalValue = 0;
     
@@ -391,18 +460,37 @@ function updateInventoryValueChart(inventory) {
         inventoryValueChart.data.labels = labels;
         inventoryValueChart.data.datasets[0].data = data;
         inventoryValueChart.data.datasets[0].backgroundColor = colors.slice(0, labels.length);
-        inventoryValueChart.update();
+        inventoryValueChart.update('none');
         
         // Update value statistics
-        document.getElementById('total-value').textContent = `$${totalValue.toLocaleString()}`;
-        document.getElementById('average-value').textContent = `$${Math.round(totalValue / inventory.length || 0).toLocaleString()}`;
-        document.getElementById('top-category').textContent = sortedCategories[0]?.[0] || 'None';
+        const totalValueEl = document.getElementById('total-value');
+        const avgValueEl = document.getElementById('average-value');
+        const topCategoryEl = document.getElementById('top-category');
+        
+        if (totalValueEl) totalValueEl.textContent = `$${totalValue.toLocaleString()}`;
+        if (avgValueEl) avgValueEl.textContent = `$${Math.round(totalValue / inventory.length || 0).toLocaleString()}`;
+        if (topCategoryEl) topCategoryEl.textContent = sortedCategories[0]?.[0] || 'None';
+    } else {
+        // No data case
+        inventoryValueChart.data.labels = ['No Data'];
+        inventoryValueChart.data.datasets[0].data = [1];
+        inventoryValueChart.data.datasets[0].backgroundColor = ['#e9ecef'];
+        inventoryValueChart.update('none');
+        
+        const totalValueEl = document.getElementById('total-value');
+        const avgValueEl = document.getElementById('average-value');
+        const topCategoryEl = document.getElementById('top-category');
+        
+        if (totalValueEl) totalValueEl.textContent = '$0';
+        if (avgValueEl) avgValueEl.textContent = '$0';
+        if (topCategoryEl) topCategoryEl.textContent = 'None';
     }
 }
 
 // Update Recent Activity Feed
 function updateRecentActivity(devices, inventory) {
     const activityContainer = document.getElementById('recent-activity');
+    if (!activityContainer) return;
     
     // Get recent devices (last 7 days)
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -555,6 +643,27 @@ async function loadDashboardData() {
 
     } catch (error) {
         console.error('Error loading dashboard data:', error);
-        showNotification('Error loading dashboard data', 'danger');
+        if (typeof showNotification !== 'undefined') {
+            showNotification('Error loading dashboard data', 'danger');
+        }
     }
 }
+
+// Utility function to format date time
+function formatDateTime(dateString) {
+    if (!dateString) return 'Never';
+    const date = new Date(dateString);
+    return date.toLocaleString();
+}
+
+// Ensure charts are responsive
+function resizeCharts() {
+    if (deviceStatusChart) deviceStatusChart.resize();
+    if (categoryChart) categoryChart.resize();
+    if (discoveryTimelineChart) discoveryTimelineChart.resize();
+    if (warrantyChart) warrantyChart.resize();
+    if (inventoryValueChart) inventoryValueChart.resize();
+}
+
+// Handle window resize
+window.addEventListener('resize', resizeCharts);

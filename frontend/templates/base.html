@@ -76,13 +76,20 @@
         </div>
     </footer>
 
-    <!-- Scripts -->
+    <!-- Core Scripts - Load in order -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-
+    
     <!-- Chart.js for dashboard charts -->
-    {% if request.endpoint == 'index' %}
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    
+    <!-- WebSocket for real-time features -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    
+    <!-- Main application scripts -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <!-- Dashboard specific scripts -->
+    {% if request.endpoint == 'index' %}
     <script src="{{ url_for('static', filename='js/dashboard-charts.js') }}"></script>
     {% endif %}
 
@@ -90,9 +97,8 @@
     {% if request.endpoint == 'categories' %}
     <script src="{{ url_for('static', filename='js/categories.js') }}"></script>
     {% endif %}
-
-    <!-- WebSocket for real-time features -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    
+    <!-- WebSocket client - load after other scripts -->
     <script src="{{ url_for('static', filename='js/websocket-client.js') }}"></script>
 
     {% block scripts %}{% endblock %}
