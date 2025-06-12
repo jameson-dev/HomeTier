@@ -1278,5 +1278,6 @@ if __name__ == '__main__':
         app, 
         host=host, 
         port=port, 
-        debug=app.config['DEBUG']
+        debug=app.config['DEBUG'],
+        allow_unsafe_werkzeug=True
     )
