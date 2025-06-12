@@ -20,7 +20,7 @@ app = Flask(__name__,
 app.config.from_object(Config)
 
 # Initialize SocketIO with threading mode
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # Initialize database
 init_db()
@@ -1264,20 +1264,17 @@ def bad_request_error(error):
 # =============================================================================
 
 if __name__ == '__main__':
-    host = app.config['HOST']
-    port = app.config['PORT']
-    
+  
     print("Starting HomeTier Application...")
-    print(f"Dashboard: http://{host}:{port}")
+    print(f"Dashboard: http://{Config.HOST}:{Config.PORT}")
     print(f"Real-time features: {'Enabled' if socketio else 'Disabled'}")
-    print(f"Debug mode: {'On' if app.config['DEBUG'] else 'Off'}")
+    print(f"Debug mode: {'On' if Config['DEBUG'] else 'Off'}")
     print("Async mode: threading")
     
     # Start the application with SocketIO using threading mode
     socketio.run(
         app, 
-        host=host, 
-        port=port, 
-        debug=app.config['DEBUG'],
-        allow_unsafe_werkzeug=True
+        host=Config['HOST'], 
+        port=Config['PORT'], 
+        debug=app.config['DEBUG']
     )
