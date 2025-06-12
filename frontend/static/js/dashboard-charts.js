@@ -28,22 +28,21 @@ if (typeof window.chartsInitialized === 'undefined') {
 
 // Initialize all charts
 function initializeCharts() {
-    if (window.chartsInitialized) {
-        console.log('Charts already initialized');
-        return;
-    }
-    
-    try {
+    // Only initialize charts if their canvas elements exist
+    if (document.getElementById('deviceStatusChart')) {
         initDeviceStatusChart();
+    }
+    if (document.getElementById('categoryChart')) {
         initCategoryChart();
+    }
+    if (document.getElementById('discoveryTimelineChart')) {
         initDiscoveryTimelineChart();
+    }
+    if (document.getElementById('warrantyChart')) {
         initWarrantyChart();
+    }
+    if (document.getElementById('inventoryValueChart')) {
         initInventoryValueChart();
-        
-        window.chartsInitialized = true;
-        console.log('All charts initialized successfully');
-    } catch (error) {
-        console.error('Error initializing charts:', error);
     }
 }
 

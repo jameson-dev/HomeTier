@@ -215,7 +215,7 @@ class HomeTierRealtime {
     }
     
     updateDeviceStatusCounts(counts) {
-        // Update status count displays
+    // Update status count displays
         const onlineCount = document.getElementById('online-count');
         const offlineCount = document.getElementById('offline-count');
         const unknownCount = document.getElementById('unknown-count');
@@ -224,8 +224,12 @@ class HomeTierRealtime {
         if (offlineCount) offlineCount.textContent = counts.offline || 0;
         if (unknownCount) unknownCount.textContent = counts.unknown || 0;
         
-        // Update device status chart if it exists
-        if (typeof deviceStatusChart !== 'undefined' && deviceStatusChart) {
+        // Update device status chart if it exists and is properly initialized
+        if (typeof deviceStatusChart !== 'undefined' && 
+            deviceStatusChart && 
+            deviceStatusChart.data && 
+            deviceStatusChart.data.datasets && 
+            deviceStatusChart.data.datasets[0]) {
             deviceStatusChart.data.datasets[0].data = [
                 counts.online || 0,
                 counts.offline || 0,
@@ -408,9 +412,14 @@ class HomeTierRealtime {
     }
     
     updateChartsFromRealtime() {
-        // Update charts without full data reload
+        // Update charts without full data reload, but only if they exist
         if (typeof loadChartData === 'function') {
-            loadChartData();
+            // Only load chart data if we're on a page that has charts
+            if (document.getElementById('deviceStatusChart') || 
+                document.getElementById('categoryChart') || 
+                document.getElementById('discoveryTimelineChart')) {
+                loadChartData();
+            }
         }
     }
     
