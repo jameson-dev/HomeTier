@@ -1045,32 +1045,25 @@ async function startNetworkScan() {
 
         const result = await response.json();
 
-        if (result.status === 'success') {
-            showNotification(
-                `Scan completed! Found ${result.devices_found} devices.`,
-                'success'
-            );
-
-            // Refresh data based on current page
-            if (window.location.pathname.includes('scanning')) {
-                await loadScanningData();
-                await loadRecentDevices();
-            } else {
-                await loadDashboardData();
-                // Also refresh chart data if on dashboard
-                if (typeof loadChartData !== 'undefined') {
-                    await loadChartData();
-                }
-            }
-        } else {
+        if (result.status !== 'success') {
             showNotification(`Scan failed: ${result.message}`, 'danger');
+            // Reset UI on error
+            scanInProgress = false;
+            [scanBtn, dashboardScanBtn].forEach(btn => {
+                if (btn) {
+                    btn.innerHTML = '<i class="fas fa-search me-2"></i>Start Manual Scan';
+                    btn.disabled = false;
+                }
+            });
+            if (scanProgress) {
+                scanProgress.style.display = 'none';
+            }
         }
 
     } catch (error) {
         console.error('Error during scan:', error);
         showNotification('Error during network scan', 'danger');
-    } finally {
-        // Reset UI for all scan buttons
+        // Reset UI on error
         scanInProgress = false;
         [scanBtn, dashboardScanBtn].forEach(btn => {
             if (btn) {
@@ -1078,7 +1071,6 @@ async function startNetworkScan() {
                 btn.disabled = false;
             }
         });
-        
         if (scanProgress) {
             scanProgress.style.display = 'none';
         }
