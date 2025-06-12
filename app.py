@@ -238,7 +238,7 @@ def handle_start_scan():
     def scan_with_progress():
         try:
             realtime_monitor.scan_in_progress = True
-            emit('scan_started', {
+            socketio.emit('scan_started', {
                 'message': 'Network scan started', 
                 'timestamp': datetime.now().isoformat()
             })
@@ -246,7 +246,7 @@ def handle_start_scan():
             network_ranges = scanner.get_network_ranges()
             
             for i, network_range in enumerate(network_ranges):
-                emit('scan_progress', {
+                socketio.emit('scan_progress', {
                     'progress': int((i / len(network_ranges)) * 100),
                     'current_range': network_range,
                     'message': f'Scanning {network_range}...'
@@ -255,20 +255,20 @@ def handle_start_scan():
                 devices = scanner.ping_scan(network_range)
                 
                 if devices:
-                    emit('scan_devices_found', {
+                    socketio.emit('scan_devices_found', {
                         'devices': devices,
                         'range': network_range,
                         'count': len(devices)
                     })
             
-            emit('scan_completed', {
+            socketio.emit('scan_completed', {
                 'message': 'Network scan completed',
                 'timestamp': datetime.now().isoformat(),
                 'total_ranges': len(network_ranges)
             })
             
         except Exception as e:
-            emit('scan_error', {'message': f'Scan failed: {str(e)}'})
+            socketio.emit('scan_error', {'message': f'Scan failed: {str(e)}'})
         finally:
             realtime_monitor.scan_in_progress = False
             
