@@ -1045,32 +1045,25 @@ async function startNetworkScan() {
 
         const result = await response.json();
 
-        if (result.status === 'success') {
-            showNotification(
-                `Scan completed! Found ${result.devices_found} devices.`,
-                'success'
-            );
-
-            // Refresh data based on current page
-            if (window.location.pathname.includes('scanning')) {
-                await loadScanningData();
-                await loadRecentDevices();
-            } else {
-                await loadDashboardData();
-                // Also refresh chart data if on dashboard
-                if (typeof loadChartData !== 'undefined') {
-                    await loadChartData();
-                }
-            }
-        } else {
+        if (result.status !== 'success') {
             showNotification(`Scan failed: ${result.message}`, 'danger');
+            // Reset UI on error
+            scanInProgress = false;
+            [scanBtn, dashboardScanBtn].forEach(btn => {
+                if (btn) {
+                    btn.innerHTML = '<i class="fas fa-search me-2"></i>Start Manual Scan';
+                    btn.disabled = false;
+                }
+            });
+            if (scanProgress) {
+                scanProgress.style.display = 'none';
+            }
         }
 
     } catch (error) {
         console.error('Error during scan:', error);
         showNotification('Error during network scan', 'danger');
-    } finally {
-        // Reset UI for all scan buttons
+        // Reset UI on error
         scanInProgress = false;
         [scanBtn, dashboardScanBtn].forEach(btn => {
             if (btn) {
@@ -1078,7 +1071,6 @@ async function startNetworkScan() {
                 btn.disabled = false;
             }
         });
-        
         if (scanProgress) {
             scanProgress.style.display = 'none';
         }
@@ -1575,6 +1567,110 @@ async function exportInventory(format) {
 
 function editInventoryItem(id) {
     showNotification('Edit functionality coming soon', 'info');
+}
+
+// Scan progress functions
+function showScanProgress(message) {
+    const scanProgress = document.getElementById('scan-progress');
+    if (scanProgress) {
+        scanProgress.style.display = 'block';
+        const progressBar = scanProgress.querySelector('.progress-bar');
+        if (progressBar) {
+            progressBar.textContent = message;
+        }
+    }
+    
+    // Update scan buttons
+    const scanBtns = document.querySelectorAll('#scan-btn, #dashboard-scan-btn');
+    scanBtns.forEach(btn => {
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Scanning...';
+            btn.disabled = true;
+        }
+    });
+}
+
+function updateScanProgress(message, data) {
+    const progressBar = document.querySelector('#scan-progress .progress-bar');
+    if (progressBar) {
+        if (data && data.progress !== undefined) {
+            progressBar.style.width = `${data.progress}%`;
+            progressBar.textContent = `${data.progress}% - ${message}`;
+        } else {
+            progressBar.textContent = message;
+        }
+    }
+}
+
+function hideScanProgress() {
+    const scanProgress = document.getElementById('scan-progress');
+    if (scanProgress) {
+        scanProgress.style.display = 'none';
+    }
+    
+    // Reset scan buttons
+    const scanBtns = document.querySelectorAll('#scan-btn, #dashboard-scan-btn');
+    scanBtns.forEach(btn => {
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-search me-2"></i>Start Manual Scan';
+            btn.disabled = false;
+        }
+    });
+}
+
+function addDeviceToTable(device) {
+    // Add device to the devices table if it exists
+    const tbody = document.getElementById('devices-table');
+    if (!tbody) return;
+    
+    // Check if device already exists in table
+    const existingRow = tbody.querySelector(`tr[data-device-id="${device.id}"]`);
+    if (existingRow) return; // Don't add duplicates
+    
+    // Create new row (simplified version - you may want to enhance this)
+    const row = document.createElement('tr');
+    row.setAttribute('data-device-id', device.id);
+    row.innerHTML = `
+        <td><input type="checkbox" class="device-checkbox" data-device-id="${device.id}"></td>
+        <td><span class="badge bg-warning">New</span></td>
+        <td>${device.ip || 'N/A'}</td>
+        <td><code>${device.mac}</code></td>
+        <td>${device.hostname || '<span class="text-muted">Unknown</span>'}</td>
+        <td>${device.vendor || '<span class="text-muted">Unknown</span>'}</td>
+        <td>${formatDateTime(new Date().toISOString())}</td>
+        <td>${formatDateTime(new Date().toISOString())}</td>
+        <td>
+            <button class="btn btn-sm btn-success me-1" onclick="addToInventory(${device.id})">
+                <i class="fas fa-plus"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="ignoreDevice(${device.id})">
+                <i class="fas fa-eye-slash"></i>
+            </button>
+        </td>
+    `;
+    
+    // Add to top of table
+    tbody.insertBefore(row, tbody.firstChild);
+}
+
+function updateDeviceCount(count) {
+    const countElements = document.querySelectorAll('#total-devices-count, #new-devices-count');
+    countElements.forEach(el => {
+        if (el) el.textContent = count;
+    });
+}
+
+function refreshAllData() {
+    // Refresh page data after scan completes
+    if (window.location.pathname.includes('scanning')) {
+        loadScanningData();
+        loadRecentDevices();
+    } else if (window.location.pathname === '/' || window.location.pathname.includes('index')) {
+        loadDashboardData();
+        if (typeof loadChartData === 'function') {
+            loadChartData();
+        }
+    }
 }
 
 // Event listeners and initialization
