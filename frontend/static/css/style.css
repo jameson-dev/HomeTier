@@ -283,3 +283,165 @@ tr:has(.device-checkbox:checked) {
         transform: translateY(0);
     }
 }
+
+/* Category Management Styles */
+
+.category-card {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.category-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.category-icon {
+    transition: all 0.3s ease;
+}
+
+.category-card:hover .category-icon {
+    transform: scale(1.1);
+}
+
+/* Category preview in modals */
+.category-preview,
+.edit-category-preview {
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* Category badges in inventory */
+.badge.d-inline-flex {
+    font-size: 0.75rem;
+    padding: 0.35em 0.65em;
+    border-radius: 0.375rem;
+}
+
+.badge.d-inline-flex i {
+    font-size: 0.8em;
+}
+
+/* Grid view responsive adjustments */
+@media (max-width: 768px) {
+    .category-card .card-body {
+        padding: 1rem;
+    }
+    
+    .category-icon {
+        width: 40px !important;
+        height: 40px !important;
+    }
+    
+    .category-icon i {
+        font-size: 1rem !important;
+    }
+}
+
+/* List view table improvements */
+.categories-table .category-icon {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Color picker improvements */
+.form-control-color {
+    border-radius: 0.375rem;
+    border: 2px solid #dee2e6;
+    cursor: pointer;
+}
+
+.form-control-color:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Category dropdown in forms */
+.form-select option[style*="font-weight: bold"] {
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+/* Animation for category cards */
+.category-card {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Category management info card */
+.card.border-info {
+    border-width: 2px !important;
+}
+
+/* Dropdown menu improvements */
+.dropdown-menu {
+    border-radius: 0.5rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.dropdown-item {
+    border-radius: 0.375rem;
+    margin: 0.125rem 0.25rem;
+}
+
+.dropdown-item:hover {
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+/* Modal improvements for categories */
+.modal-header {
+    border-bottom: 2px solid #dee2e6;
+}
+
+.modal-footer {
+    border-top: 2px solid #dee2e6;
+}
+
+/* View toggle buttons */
+.btn-check:checked + .btn-outline-primary {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+    color: white;
+}
+
+/* Category count badge */
+.category-card .badge {
+    font-size: 0.7rem;
+    padding: 0.25em 0.5em;
+}
+
+/* Responsive grid adjustments */
+@media (min-width: 1200px) {
+    .category-grid .col-lg-4 {
+        flex: 0 0 25%;
+        max-width: 25%;
+    }
+}
+
+/* Loading state */
+.category-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Error state */
+.category-error {
+    border: 2px solid var(--bs-danger);
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
+/* Success state */
+.category-success {
+    border: 2px solid var(--bs-success);
+    background-color: rgba(25, 135, 84, 0.1);
+}

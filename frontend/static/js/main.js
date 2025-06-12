@@ -1,8 +1,9 @@
-// Main JavaScript Functions
+// Main JavaScript Functions with Categories Support
 
 // Global variables
 let currentDevices = [];
 let currentInventory = [];
+let availableCategories = [];
 let scanInProgress = false;
 let currentFilter = 'all';
 let selectedDevices = new Set(); // Track selected device IDs
@@ -36,6 +37,92 @@ function showNotification(message, type = 'info') {
             notification.remove();
         }
     }, 5000);
+}
+
+// Categories management functions
+async function loadCategoriesForForms() {
+    try {
+        const response = await fetch('/api/categories');
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            availableCategories = result.categories;
+            updateCategoryDropdowns();
+            updateCategoryFilters();
+        }
+    } catch (error) {
+        console.error('Error loading categories:', error);
+    }
+}
+
+function updateCategoryDropdowns() {
+    const dropdowns = [
+        'category',           // Single add modal
+        'newCategory',        // New inventory modal
+        'bulkCategory'        // Bulk add modal
+    ];
+    
+    dropdowns.forEach(dropdownId => {
+        const dropdown = document.getElementById(dropdownId);
+        if (dropdown) {
+            updateSingleCategoryDropdown(dropdown);
+        }
+    });
+    
+    // Update individual device forms in bulk modal if they exist
+    document.querySelectorAll('.device-field[data-field="category"]').forEach(dropdown => {
+        updateSingleCategoryDropdown(dropdown);
+    });
+}
+
+function updateSingleCategoryDropdown(dropdown) {
+    const currentValue = dropdown.value;
+    
+    // Clear existing options except first
+    dropdown.innerHTML = '<option value="">Select category...</option>';
+    
+    // Add categories
+    availableCategories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category.id;
+        option.textContent = category.name;
+        option.dataset.categoryName = category.name;
+        
+        // Add visual indicator for default categories
+        if (category.is_default) {
+            option.style.fontWeight = 'bold';
+        }
+        
+        dropdown.appendChild(option);
+    });
+    
+    // Restore previous selection if it still exists
+    if (currentValue) {
+        dropdown.value = currentValue;
+    }
+}
+
+function updateCategoryFilters() {
+    const categoryFilter = document.getElementById('categoryFilter');
+    if (categoryFilter) {
+        const currentValue = categoryFilter.value;
+        
+        // Clear existing options except first
+        categoryFilter.innerHTML = '<option value="">All Categories</option>';
+        
+        // Add categories
+        availableCategories.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category.name;
+            option.textContent = category.name;
+            categoryFilter.appendChild(option);
+        });
+        
+        // Restore previous selection
+        if (currentValue) {
+            categoryFilter.value = currentValue;
+        }
+    }
 }
 
 // Dashboard functions
@@ -98,7 +185,12 @@ async function loadCategoryStats() {
 
         categoryStatsDiv.innerHTML = stats.category_stats.map(item => `
             <div class="d-flex justify-content-between align-items-center mb-2">
-                <span>${item.category || 'Uncategorized'}</span>
+                <div class="d-flex align-items-center">
+                    <div class="category-icon me-2" style="background-color: ${item.color}; color: white; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem;">
+                        <i class="${item.icon}"></i>
+                    </div>
+                    <span>${item.category}</span>
+                </div>
                 <span class="badge bg-primary">${item.count}</span>
             </div>
         `).join('');
@@ -198,7 +290,7 @@ async function loadRecentDevices() {
         const devices = await devicesResponse.json();
         const inventory = await inventoryResponse.json();
         currentDevices = devices;
-        currentInventory = inventory; // Make sure we update the global inventory state
+        currentInventory = inventory;
         
         const tbody = document.getElementById('devices-table');
         if (!tbody) return;
@@ -438,7 +530,7 @@ function clearSelection() {
     updateSelectAllCheckbox();
 }
 
-// Bulk operation functions for devices
+// Enhanced bulk operation functions with category support
 async function bulkAddToInventory() {
     if (selectedDevices.size === 0) {
         showNotification('No devices selected', 'warning');
@@ -468,6 +560,9 @@ async function bulkAddToInventory() {
     window.bulkEligibleDevices = eligibleDeviceIds.map(id => 
         currentDevices.find(d => d.id === id)
     );
+    
+    // Load categories and update dropdowns
+    await loadCategoriesForForms();
     
     // Reset to common mode
     document.getElementById('commonMode').checked = true;
@@ -504,6 +599,11 @@ function toggleConfigMode() {
 function populateIndividualDevicesList() {
     const container = document.getElementById('individual-devices-list');
     
+    // Build category options
+    const categoryOptions = availableCategories.map(category => 
+        `<option value="${category.id}" data-category-name="${category.name}">${category.name}</option>`
+    ).join('');
+    
     container.innerHTML = window.bulkEligibleDevices.map((device, index) => {
         const suggestedName = device.hostname && device.hostname !== 'Unknown' 
             ? device.hostname 
@@ -538,15 +638,7 @@ function populateIndividualDevicesList() {
                             <label class="form-label mb-1 fw-bold text-primary small">Category</label>
                             <select class="form-select form-select-sm device-field" data-field="category">
                                 <option value="">Select category...</option>
-                                <option value="Router">Router</option>
-                                <option value="Switch">Switch</option>
-                                <option value="Access Point">Access Point</option>
-                                <option value="Smart Home">Smart Home Device</option>
-                                <option value="Computer">Computer</option>
-                                <option value="Mobile">Mobile Device</option>
-                                <option value="IoT">IoT Device</option>
-                                <option value="Appliance">Appliance</option>
-                                <option value="Other">Other</option>
+                                ${categoryOptions}
                             </select>
                         </div>
                     </div>
@@ -604,9 +696,8 @@ function copyCommonToAll() {
     const commonForm = document.getElementById('bulkInventoryForm');
     const formData = new FormData(commonForm);
     
-    // Get common values
+    // Get common values including category
     const commonValues = {
-        category: formData.get('category'),
         brand: formData.get('brand'),
         model: formData.get('model'),
         purchase_date: formData.get('purchase_date'),
@@ -616,6 +707,12 @@ function copyCommonToAll() {
         serial_number: formData.get('serial_number'),
         notes: formData.get('notes')
     };
+    
+    // Handle category specially
+    const categoryDropdown = document.getElementById('bulkCategory');
+    if (categoryDropdown && categoryDropdown.value) {
+        commonValues.category = categoryDropdown.value;
+    }
     
     // Apply to all individual device forms
     document.querySelectorAll('.device-config-card').forEach(card => {
@@ -648,7 +745,6 @@ async function saveBulkToInventoryCommon() {
     const useAutoNames = document.getElementById('useDeviceNames').checked;
     
     const commonData = {
-        category: formData.get('category'),
         brand: formData.get('brand'),
         model: formData.get('model'),
         purchase_date: formData.get('purchase_date'),
@@ -658,6 +754,16 @@ async function saveBulkToInventoryCommon() {
         serial_number: formData.get('serial_number'),
         notes: formData.get('notes')
     };
+    
+    // Handle category
+    const categoryDropdown = document.getElementById('bulkCategory');
+    if (categoryDropdown && categoryDropdown.value) {
+        commonData.category_id = categoryDropdown.value;
+        const selectedOption = categoryDropdown.options[categoryDropdown.selectedIndex];
+        if (selectedOption) {
+            commonData.category = selectedOption.dataset.categoryName || selectedOption.textContent;
+        }
+    }
     
     try {
         const response = await fetch('/api/devices/bulk/add-to-inventory', {
@@ -701,7 +807,17 @@ async function saveBulkToInventoryIndividual() {
                 hasErrors = true;
             } else {
                 field.classList.remove('is-invalid');
-                data[fieldName] = value || null;
+                
+                // Handle category specially
+                if (fieldName === 'category' && value) {
+                    data.category_id = value;
+                    const selectedOption = field.options[field.selectedIndex];
+                    if (selectedOption) {
+                        data.category = selectedOption.dataset.categoryName || selectedOption.textContent;
+                    }
+                } else {
+                    data[fieldName] = value || null;
+                }
             }
         });
         
@@ -924,36 +1040,60 @@ async function startNetworkScan() {
     }
 }
 
-// Individual device management functions
+// Enhanced individual device management functions with category support
 function addToInventory(deviceId) {
     const device = currentDevices.find(d => d.id === deviceId);
     if (!device) return;
 
-    // Populate modal with device info
-    document.getElementById('deviceId').value = deviceId;
-    document.getElementById('deviceName').value = device.hostname || `Device ${device.ip_address}`;
+    // Load categories first, then populate modal
+    loadCategoriesForForms().then(() => {
+        // Populate modal with device info
+        document.getElementById('deviceId').value = deviceId;
+        document.getElementById('deviceName').value = device.hostname || `Device ${device.ip_address}`;
 
-    // Pre-select category based on vendor
-    const category = document.getElementById('category');
-    if (device.vendor && category) {
-        const vendor = device.vendor.toLowerCase();
-        if (vendor.includes('cisco') || vendor.includes('netgear') || vendor.includes('linksys')) {
-            category.value = 'Router';
-        } else if (vendor.includes('ubiquiti')) {
-            category.value = 'Access Point';
-        } else if (vendor.includes('raspberry') || vendor.includes('intel')) {
-            category.value = 'Computer';
+        // Pre-select category based on vendor
+        const categoryDropdown = document.getElementById('category');
+        if (device.vendor && categoryDropdown && availableCategories.length > 0) {
+            const vendor = device.vendor.toLowerCase();
+            let suggestedCategoryName = null;
+            
+            if (vendor.includes('cisco') || vendor.includes('netgear') || vendor.includes('linksys')) {
+                suggestedCategoryName = 'Router';
+            } else if (vendor.includes('ubiquiti')) {
+                suggestedCategoryName = 'Access Point';
+            } else if (vendor.includes('raspberry') || vendor.includes('intel')) {
+                suggestedCategoryName = 'Computer';
+            }
+            
+            if (suggestedCategoryName) {
+                const suggestedCategory = availableCategories.find(cat => cat.name === suggestedCategoryName);
+                if (suggestedCategory) {
+                    categoryDropdown.value = suggestedCategory.id;
+                }
+            }
         }
-    }
 
-    // Show modal
-    const modal = new bootstrap.Modal(document.getElementById('addToInventoryModal'));
-    modal.show();
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('addToInventoryModal'));
+        modal.show();
+    });
 }
 
 async function saveToInventory() {
     const form = document.getElementById('inventoryForm');
     const formData = new FormData(form);
+    
+    // Handle category selection
+    const categoryDropdown = document.getElementById('category');
+    if (categoryDropdown && categoryDropdown.value) {
+        formData.set('category_id', categoryDropdown.value);
+        
+        // Also set category name for backward compatibility
+        const selectedOption = categoryDropdown.options[categoryDropdown.selectedIndex];
+        if (selectedOption) {
+            formData.set('category', selectedOption.dataset.categoryName || selectedOption.textContent);
+        }
+    }
 
     try {
         const response = await fetch('/api/inventory', {
@@ -969,10 +1109,10 @@ async function saveToInventory() {
             // Close modal and refresh data
             const modal = bootstrap.Modal.getInstance(document.getElementById('addToInventoryModal'));
             modal.hide();
+            form.reset();
 
             // Refresh appropriate data based on current page
             if (window.location.pathname.includes('scanning')) {
-                // For scanning page, we need to refresh both inventory and devices data
                 await Promise.all([
                     loadScanningData(),
                     fetch('/api/inventory').then(res => res.json()).then(inventory => {
@@ -1059,7 +1199,7 @@ async function unignoreDevice(deviceId) {
     }
 }
 
-// Inventory-specific functions
+// Enhanced inventory-specific functions with category support
 async function loadInventoryData() {
     try {
         const response = await fetch('/api/inventory');
@@ -1092,6 +1232,9 @@ function updateInventoryTable(inventory) {
 
     tbody.innerHTML = inventory.map(item => {
         const isSelected = selectedInventoryItems.has(item.id);
+        const categoryDisplay = item.category_name || item.category || 'Uncategorized';
+        const categoryColor = item.category_color || '#6c757d';
+        const categoryIcon = item.category_icon || 'fas fa-question';
         
         return `
             <tr data-inventory-id="${item.id}">
@@ -1106,7 +1249,9 @@ function updateInventoryTable(inventory) {
                     ${item.serial_number ? `<br><small class="text-muted">S/N: ${item.serial_number}</small>` : ''}
                 </td>
                 <td>
-                    <span class="badge bg-secondary">${item.category || 'Uncategorized'}</span>
+                    <span class="badge d-inline-flex align-items-center" style="background-color: ${categoryColor}; color: white;">
+                        <i class="${categoryIcon} me-1"></i>${categoryDisplay}
+                    </span>
                 </td>
                 <td>
                     ${item.brand ? `<strong>${item.brand}</strong>` : ''}
@@ -1302,6 +1447,18 @@ async function deleteInventoryItem(id) {
 async function saveNewInventory() {
     const form = document.getElementById('newInventoryForm');
     const formData = new FormData(form);
+    
+    // Handle category selection
+    const categoryDropdown = document.getElementById('newCategory');
+    if (categoryDropdown && categoryDropdown.value) {
+        formData.set('category_id', categoryDropdown.value);
+        
+        // Also set category name for backward compatibility
+        const selectedOption = categoryDropdown.options[categoryDropdown.selectedIndex];
+        if (selectedOption) {
+            formData.set('category', selectedOption.dataset.categoryName || selectedOption.textContent);
+        }
+    }
 
     try {
         const response = await fetch('/api/inventory', {
@@ -1375,22 +1532,54 @@ function editInventoryItem(id) {
     showNotification('Edit functionality coming soon', 'info');
 }
 
-// Event listeners
+// Event listeners and initialization
 document.addEventListener('DOMContentLoaded', function () {
+    // Load categories for forms on all pages
+    loadCategoriesForForms();
+    
     // Bind scan button
     const scanBtn = document.getElementById('scan-btn');
     if (scanBtn) {
         scanBtn.addEventListener('click', startNetworkScan);
     }
+    
+    // Load appropriate data based on current page
+    const currentPath = window.location.pathname;
+    
+    if (currentPath.includes('scanning')) {
+        loadScanningData();
+        loadRecentDevices();
+        
+        // Add event listeners for filter buttons
+        document.querySelectorAll('input[name="deviceFilter"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                filterDevices(this.value);
+            });
+        });
+    } else if (currentPath.includes('inventory')) {
+        loadInventoryData();
+    } else if (currentPath === '/' || currentPath.includes('index')) {
+        loadDashboardData();
+        loadCategoryStats();
+        loadWarrantyAlerts();
+    }
+    
+    // Load categories when modals are shown
+    document.getElementById('addToInventoryModal')?.addEventListener('shown.bs.modal', loadCategoriesForForms);
+    document.getElementById('addInventoryModal')?.addEventListener('shown.bs.modal', loadCategoriesForForms);
+    document.getElementById('bulkAddToInventoryModal')?.addEventListener('shown.bs.modal', loadCategoriesForForms);
 });
 
 // Auto-refresh every 30 seconds
 setInterval(() => {
     if (!scanInProgress) {
-        if (window.location.pathname.includes('scanning')) {
+        const currentPath = window.location.pathname;
+        
+        if (currentPath.includes('scanning')) {
             loadScanningData();
-        } else {
+        } else if (currentPath === '/' || currentPath.includes('index')) {
             loadDashboardData();
         }
+        // Don't auto-refresh inventory page to avoid disrupting user input
     }
 }, 30000);
