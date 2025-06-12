@@ -1,6 +1,3 @@
-import eventlet
-eventlet.monkey_patch()
-
 from flask import Flask, render_template, request, jsonify, make_response
 from flask_socketio import SocketIO, emit
 from backend.database import (
@@ -21,8 +18,8 @@ app = Flask(__name__,
            static_folder='frontend/static')
 app.config.from_object(Config)
 
-# Initialize SocketIO for real-time features
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+# Initialize SocketIO with threading mode
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Initialize database
 init_db()
@@ -1203,7 +1200,6 @@ def bad_request_error(error):
 # =============================================================================
 
 if __name__ == '__main__':
-    
     host = app.config['HOST']
     port = app.config['PORT']
     
@@ -1211,12 +1207,12 @@ if __name__ == '__main__':
     print(f"Dashboard: http://{host}:{port}")
     print(f"Real-time features: {'Enabled' if socketio else 'Disabled'}")
     print(f"Debug mode: {'On' if app.config['DEBUG'] else 'Off'}")
+    print("Async mode: threading")
     
-    # Start the application with SocketIO
+    # Start the application with SocketIO using threading mode
     socketio.run(
         app, 
         host=host, 
         port=port, 
-        debug=app.config['DEBUG'],
-        allow_unsafe_werkzeug=True
+        debug=app.config['DEBUG']
     )
