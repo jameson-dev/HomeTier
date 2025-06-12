@@ -1,28 +1,46 @@
 // Dashboard Charts JavaScript Functions
 
-// Chart configurations and instances
-const chartConfigs = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-        legend: {
-            display: true,
-            position: 'bottom'
+// Check if charts are already initialized to avoid redeclaration
+if (typeof window.chartsInitialized === 'undefined') {
+    window.chartsInitialized = false;
+    
+    // Chart configurations
+    window.chartConfigs = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: true,
+                position: 'bottom'
+            }
         }
-    }
-};
+    };
 
-// Chart instances
-let deviceStatusChart, categoryChart, discoveryTimelineChart, warrantyChart, inventoryValueChart;
+    // Chart instances - use window object to avoid redeclaration
+    window.dashboardCharts = {
+        deviceStatus: null,
+        category: null,
+        discoveryTimeline: null,
+        warranty: null,
+        inventoryValue: null
+    };
+}
 
 // Initialize all charts
 function initializeCharts() {
+    if (window.chartsInitialized) {
+        console.log('Charts already initialized');
+        return;
+    }
+    
     try {
         initDeviceStatusChart();
         initCategoryChart();
         initDiscoveryTimelineChart();
         initWarrantyChart();
         initInventoryValueChart();
+        
+        window.chartsInitialized = true;
         console.log('All charts initialized successfully');
     } catch (error) {
         console.error('Error initializing charts:', error);
@@ -39,7 +57,7 @@ function initDeviceStatusChart() {
     
     const ctx = canvas.getContext('2d');
     
-    deviceStatusChart = new Chart(ctx, {
+    window.dashboardCharts.deviceStatus = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: ['Online', 'Offline', 'Unknown'],
@@ -55,7 +73,7 @@ function initDeviceStatusChart() {
             }]
         },
         options: {
-            ...chartConfigs,
+            ...window.chartConfigs,
             cutout: '60%',
             plugins: {
                 legend: {
@@ -94,7 +112,7 @@ function initCategoryChart() {
     
     const ctx = canvas.getContext('2d');
     
-    categoryChart = new Chart(ctx, {
+    window.dashboardCharts.category = new Chart(ctx, {
         type: 'pie',
         data: {
             labels: [],
@@ -106,7 +124,7 @@ function initCategoryChart() {
             }]
         },
         options: {
-            ...chartConfigs,
+            ...window.chartConfigs,
             plugins: {
                 legend: {
                     display: false // We'll create a custom legend
@@ -126,7 +144,7 @@ function initCategoryChart() {
             onClick: (event, elements) => {
                 if (elements.length > 0) {
                     const index = elements[0].index;
-                    const category = categoryChart.data.labels[index];
+                    const category = window.dashboardCharts.category.data.labels[index];
                     filterInventoryByCategory(category);
                 }
             }
@@ -144,7 +162,7 @@ function initDiscoveryTimelineChart() {
     
     const ctx = canvas.getContext('2d');
     
-    discoveryTimelineChart = new Chart(ctx, {
+    window.dashboardCharts.discoveryTimeline = new Chart(ctx, {
         type: 'line',
         data: {
             labels: [],
@@ -158,7 +176,7 @@ function initDiscoveryTimelineChart() {
             }]
         },
         options: {
-            ...chartConfigs,
+            ...window.chartConfigs,
             scales: {
                 y: {
                     beginAtZero: true,
@@ -191,7 +209,7 @@ function initWarrantyChart() {
     
     const ctx = canvas.getContext('2d');
     
-    warrantyChart = new Chart(ctx, {
+    window.dashboardCharts.warranty = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: ['Active', 'Expiring Soon', 'Expired', 'Unknown'],
@@ -208,7 +226,7 @@ function initWarrantyChart() {
             }]
         },
         options: {
-            ...chartConfigs,
+            ...window.chartConfigs,
             cutout: '50%',
             plugins: {
                 legend: {
@@ -234,7 +252,7 @@ function initInventoryValueChart() {
     
     const ctx = canvas.getContext('2d');
     
-    inventoryValueChart = new Chart(ctx, {
+    window.dashboardCharts.inventoryValue = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: [],
@@ -246,7 +264,7 @@ function initInventoryValueChart() {
             }]
         },
         options: {
-            ...chartConfigs,
+            ...window.chartConfigs,
             cutout: '70%',
             plugins: {
                 legend: {
@@ -288,13 +306,16 @@ async function loadChartData() {
         
     } catch (error) {
         console.error('Error loading chart data:', error);
-        showNotification('Error loading chart data', 'danger');
+        if (typeof showNotification !== 'undefined') {
+            showNotification('Error loading chart data', 'danger');
+        }
     }
 }
 
 // Update Device Status Chart
 function updateDeviceStatusChart(devices) {
-    if (!deviceStatusChart) return;
+    const chart = window.dashboardCharts.deviceStatus;
+    if (!chart) return;
     
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
@@ -314,8 +335,8 @@ function updateDeviceStatusChart(devices) {
         }
     });
     
-    deviceStatusChart.data.datasets[0].data = [online, offline, unknown];
-    deviceStatusChart.update('none');
+    chart.data.datasets[0].data = [online, offline, unknown];
+    chart.update('none');
     
     // Update status counts
     const onlineCount = document.getElementById('online-count');
@@ -329,13 +350,14 @@ function updateDeviceStatusChart(devices) {
 
 // Update Category Chart
 function updateCategoryChart(categoryStats) {
-    if (!categoryChart) return;
+    const chart = window.dashboardCharts.category;
+    if (!chart) return;
     
     if (!categoryStats || categoryStats.length === 0) {
-        categoryChart.data.labels = ['No Data'];
-        categoryChart.data.datasets[0].data = [1];
-        categoryChart.data.datasets[0].backgroundColor = ['#e9ecef'];
-        categoryChart.update('none');
+        chart.data.labels = ['No Data'];
+        chart.data.datasets[0].data = [1];
+        chart.data.datasets[0].backgroundColor = ['#e9ecef'];
+        chart.update('none');
         
         // Clear legend
         const legendContainer = document.getElementById('category-legend');
@@ -349,10 +371,10 @@ function updateCategoryChart(categoryStats) {
     const data = categoryStats.map(stat => stat.count);
     const colors = categoryStats.map(stat => stat.color || '#6c757d');
     
-    categoryChart.data.labels = labels;
-    categoryChart.data.datasets[0].data = data;
-    categoryChart.data.datasets[0].backgroundColor = colors;
-    categoryChart.update('none');
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = data;
+    chart.data.datasets[0].backgroundColor = colors;
+    chart.update('none');
     
     // Create custom legend
     createCategoryLegend(categoryStats);
@@ -378,7 +400,8 @@ function createCategoryLegend(categoryStats) {
 
 // Update Discovery Timeline
 async function updateDiscoveryTimeline(days = 7) {
-    if (!discoveryTimelineChart) return;
+    const chart = window.dashboardCharts.discoveryTimeline;
+    if (!chart) return;
     
     try {
         const response = await fetch(`/api/devices/timeline?days=${days}`);
@@ -391,22 +414,23 @@ async function updateDiscoveryTimeline(days = 7) {
             });
             const data = timelineData.timeline.map(point => point.count);
             
-            discoveryTimelineChart.data.labels = labels;
-            discoveryTimelineChart.data.datasets[0].data = data;
-            discoveryTimelineChart.update('none');
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = data;
+            chart.update('none');
         }
     } catch (error) {
         console.error('Error loading timeline data:', error);
         // Fallback to empty chart
-        discoveryTimelineChart.data.labels = [];
-        discoveryTimelineChart.data.datasets[0].data = [];
-        discoveryTimelineChart.update('none');
+        chart.data.labels = [];
+        chart.data.datasets[0].data = [];
+        chart.update('none');
     }
 }
 
 // Update Warranty Chart
 function updateWarrantyChart(inventory) {
-    if (!warrantyChart) return;
+    const chart = window.dashboardCharts.warranty;
+    if (!chart) return;
     
     const now = new Date();
     const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -429,13 +453,14 @@ function updateWarrantyChart(inventory) {
         }
     });
     
-    warrantyChart.data.datasets[0].data = [active, expiring, expired, unknown];
-    warrantyChart.update('none');
+    chart.data.datasets[0].data = [active, expiring, expired, unknown];
+    chart.update('none');
 }
 
 // Update Inventory Value Chart
 function updateInventoryValueChart(inventory) {
-    if (!inventoryValueChart) return;
+    const chart = window.dashboardCharts.inventoryValue;
+    if (!chart) return;
     
     const categoryValues = {};
     let totalValue = 0;
@@ -457,10 +482,10 @@ function updateInventoryValueChart(inventory) {
         const data = sortedCategories.map(([, value]) => value);
         const colors = ['#007bff', '#28a745', '#ffc107', '#dc3545', '#6c757d'];
         
-        inventoryValueChart.data.labels = labels;
-        inventoryValueChart.data.datasets[0].data = data;
-        inventoryValueChart.data.datasets[0].backgroundColor = colors.slice(0, labels.length);
-        inventoryValueChart.update('none');
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = data;
+        chart.data.datasets[0].backgroundColor = colors.slice(0, labels.length);
+        chart.update('none');
         
         // Update value statistics
         const totalValueEl = document.getElementById('total-value');
@@ -472,10 +497,10 @@ function updateInventoryValueChart(inventory) {
         if (topCategoryEl) topCategoryEl.textContent = sortedCategories[0]?.[0] || 'None';
     } else {
         // No data case
-        inventoryValueChart.data.labels = ['No Data'];
-        inventoryValueChart.data.datasets[0].data = [1];
-        inventoryValueChart.data.datasets[0].backgroundColor = ['#e9ecef'];
-        inventoryValueChart.update('none');
+        chart.data.labels = ['No Data'];
+        chart.data.datasets[0].data = [1];
+        chart.data.datasets[0].backgroundColor = ['#e9ecef'];
+        chart.update('none');
         
         const totalValueEl = document.getElementById('total-value');
         const avgValueEl = document.getElementById('average-value');
@@ -594,7 +619,7 @@ function filterInventoryByCategory(category = null) {
     window.location.href = url;
 }
 
-// Enhanced loadDashboardData function with chart integration
+// Load Dashboard Data function with chart integration
 async function loadDashboardData() {
     try {
         const [devicesResponse, inventoryResponse] = await Promise.all([
@@ -658,11 +683,13 @@ function formatDateTime(dateString) {
 
 // Ensure charts are responsive
 function resizeCharts() {
-    if (deviceStatusChart) deviceStatusChart.resize();
-    if (categoryChart) categoryChart.resize();
-    if (discoveryTimelineChart) discoveryTimelineChart.resize();
-    if (warrantyChart) warrantyChart.resize();
-    if (inventoryValueChart) inventoryValueChart.resize();
+    if (window.dashboardCharts) {
+        Object.values(window.dashboardCharts).forEach(chart => {
+            if (chart && typeof chart.resize === 'function') {
+                chart.resize();
+            }
+        });
+    }
 }
 
 // Handle window resize

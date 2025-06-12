@@ -285,45 +285,85 @@
 
 {% block scripts %}
 <script>
-    // Chart instances
-    let deviceStatusChart, categoryChart, discoveryTimelineChart, warrantyChart, inventoryValueChart;
-    
-    // Load dashboard data and initialize charts on page load
+    // Dashboard initialization - runs once when page loads
     document.addEventListener('DOMContentLoaded', function() {
-        // Initialize charts first
-        initializeCharts();
+        // Wait for Chart.js to be available
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js not loaded');
+            return;
+        }
         
-        // Load data
-        loadDashboardData();
-        loadCategoryStats();
-        loadWarrantyAlerts();
-        loadChartData();
+        // Initialize dashboard
+        initializeDashboard();
         
-        // Add event listeners for timeline range buttons
+        // Auto-refresh every 60 seconds
+        setInterval(() => {
+            if (!window.scanInProgress) {
+                refreshDashboardData();
+            }
+        }, 60000);
+    });
+    
+    function initializeDashboard() {
+        try {
+            // Initialize charts first
+            if (typeof initializeCharts === 'function') {
+                initializeCharts();
+            }
+            
+            // Load initial data
+            loadDashboardData();
+            loadCategoryStats();
+            loadWarrantyAlerts();
+            
+            // Load chart data
+            if (typeof loadChartData === 'function') {
+                loadChartData();
+            }
+            
+            // Setup event listeners
+            setupDashboardEventListeners();
+            
+            console.log('Dashboard initialized successfully');
+        } catch (error) {
+            console.error('Error initializing dashboard:', error);
+        }
+    }
+    
+    function setupDashboardEventListeners() {
+        // Timeline range buttons
         document.querySelectorAll('input[name="timelineRange"]').forEach(radio => {
             radio.addEventListener('change', function() {
-                updateDiscoveryTimeline(parseInt(this.value));
+                if (typeof updateDiscoveryTimeline === 'function') {
+                    updateDiscoveryTimeline(parseInt(this.value));
+                }
             });
         });
         
-        // Bind dashboard scan button
+        // Dashboard scan button
         const dashboardScanBtn = document.getElementById('dashboard-scan-btn');
         if (dashboardScanBtn) {
             dashboardScanBtn.addEventListener('click', function() {
                 if (window.homeTierRealtime && window.homeTierRealtime.connected) {
                     window.homeTierRealtime.startNetworkScan();
-                } else {
+                } else if (typeof startNetworkScan === 'function') {
                     startNetworkScan();
+                } else {
+                    console.error('No scan function available');
                 }
             });
         }
-        
-        // Auto-refresh charts every 60 seconds
-        setInterval(() => {
-            if (!scanInProgress) {
+    }
+    
+    function refreshDashboardData() {
+        try {
+            loadDashboardData();
+            if (typeof loadChartData === 'function') {
                 loadChartData();
             }
-        }, 60000);
-    });
+        } catch (error) {
+            console.error('Error refreshing dashboard data:', error);
+        }
+    }
 </script>
 {% endblock %}
