@@ -281,7 +281,7 @@ def scan_with_progress():
                     'count': len(devices)
                 })
         
-        socketio.emit('scan_completed', {
+        socketio.emit('scan_complete', {
             'message': f'Network scan completed! Found {len(all_devices)} devices.',
             'devices_found': len(all_devices),
             'timestamp': datetime.now().isoformat(),
