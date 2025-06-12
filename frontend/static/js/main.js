@@ -9,6 +9,39 @@ let currentFilter = 'all';
 let selectedDevices = new Set(); // Track selected device IDs
 let selectedInventoryItems = new Set(); // Track selected inventory item IDs
 
+// Initialize SocketIO
+const socket = io();
+
+// Socket event listeners for real-time scan updates
+socket.on('scan_start', function(data) {
+    console.log('Scan started:', data.message);
+    showScanProgress(data.message);
+});
+
+socket.on('scan_progress', function(data) {
+    console.log('Scan progress:', data.message);
+    updateScanProgress(data.message, data);
+});
+
+socket.on('device_discovered', function(data) {
+    console.log('Device discovered:', data.device);
+    addDeviceToTable(data.device);
+    updateDeviceCount(data.total_found);
+});
+
+socket.on('scan_complete', function(data) {
+    console.log('Scan complete:', data.message);
+    hideScanProgress();
+    showNotification(data.message, 'success');
+    refreshAllData();
+});
+
+socket.on('scan_error', function(data) {
+    console.log('Scan error:', data.message);
+    hideScanProgress();
+    showNotification(data.message, 'danger');
+});
+
 // Utility functions
 function formatDate(dateString) {
     if (!dateString) return 'N/A';

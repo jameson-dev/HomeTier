@@ -874,29 +874,76 @@ def get_inventory_metrics():
 
 @app.route('/api/scan', methods=['POST'])
 def trigger_scan():
+    """Trigger a network scan with real-time progress"""
     try:
-        # Emit scan start event
-        socketio.emit('scan_initiated', {
-            'message': 'Manual scan initiated',
-            'timestamp': datetime.now().isoformat()
-        })
+        # Start scan in background thread with proper context
+        def scan_with_progress():
+            try:
+                with app.app_context():
+                    socketio.emit('scan_start', {'message': 'Starting network scan...'})
+                    
+                    # Get network ranges first
+                    ranges = scanner.get_network_ranges()
+                    total_ranges = len(ranges)
+                    
+                    socketio.emit('scan_progress', {
+                        'message': f'Scanning {total_ranges} network range(s)...',
+                        'ranges': ranges
+                    })
+                    
+                    all_devices = []
+                    
+                    for i, network_range in enumerate(ranges):
+                        socketio.emit('scan_progress', {
+                            'message': f'Scanning range {i+1}/{total_ranges}: {network_range}',
+                            'current_range': network_range,
+                            'range_progress': i + 1,
+                            'total_ranges': total_ranges
+                        })
+                        
+                        # Scan this range
+                        if scanner.detect_wsl2():
+                            devices = scanner.wsl2_ping_scan(network_range)
+                        else:
+                            devices = scanner.ping_scan(network_range)
+                        
+                        # Emit each discovered device immediately
+                        for device in devices:
+                            if device['mac']:
+                                device_id = scanner.add_device(
+                                    mac_address=device['mac'],
+                                    ip_address=device['ip'],
+                                    hostname=device['hostname'],
+                                    vendor=device['vendor']
+                                )
+                                device['id'] = device_id
+                                all_devices.append(device)
+                                
+                                socketio.emit('device_discovered', {
+                                    'device': device,
+                                    'total_found': len(all_devices)
+                                })
+                    
+                    socketio.emit('scan_complete', {
+                        'message': f'Scan completed! Found {len(all_devices)} devices.',
+                        'devices_found': len(all_devices),
+                        'devices': all_devices
+                    })
+                    
+            except Exception as e:
+                socketio.emit('scan_error', {'message': f'Scan failed: {str(e)}'})
         
-        devices = scanner.scan_network()
-        
-        # Emit scan completion
-        socketio.emit('scan_completed', {
-            'devices_found': len(devices),
-            'devices': devices,
-            'timestamp': datetime.now().isoformat()
-        })
+        # Start the scan in a background thread
+        scan_thread = threading.Thread(target=scan_with_progress)
+        scan_thread.daemon = True
+        scan_thread.start()
         
         return jsonify({
             'status': 'success',
-            'devices_found': len(devices),
-            'devices': devices
+            'message': 'Network scan started. Watch for real-time updates.'
         })
+        
     except Exception as e:
-        socketio.emit('scan_error', {'message': str(e)})
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/scanning/stats', methods=['GET'])
