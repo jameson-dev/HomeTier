@@ -286,28 +286,45 @@ function initInventoryValueChart() {
 // Load and update chart data
 async function loadChartData() {
     try {
+        // Add a small delay to ensure DOM is ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         const [devicesResponse, inventoryResponse, statsResponse] = await Promise.all([
             fetch('/api/devices'),
             fetch('/api/inventory'),
             fetch('/api/dashboard/stats')
         ]);
         
+        if (!devicesResponse.ok || !inventoryResponse.ok || !statsResponse.ok) {
+            throw new Error('One or more API requests failed');
+        }
+        
         const devices = await devicesResponse.json();
         const inventory = await inventoryResponse.json();
         const stats = await statsResponse.json();
         
-        updateDeviceStatusChart(devices);
-        updateCategoryChart(stats.category_stats);
-        updateDiscoveryTimeline(7); // Default to 7 days
-        updateWarrantyChart(inventory);
-        updateInventoryValueChart(inventory);
-        updateRecentActivity(devices, inventory);
+        if (typeof updateDeviceStatusChart !== 'undefined') {
+            updateDeviceStatusChart(devices);
+        }
+        if (typeof updateCategoryChart !== 'undefined' && stats.category_stats) {
+            updateCategoryChart(stats.category_stats);
+        }
+        if (typeof updateDiscoveryTimeline !== 'undefined') {
+            updateDiscoveryTimeline(7); // Default to 7 days
+        }
+        if (typeof updateWarrantyChart !== 'undefined') {
+            updateWarrantyChart(inventory);
+        }
+        if (typeof updateInventoryValueChart !== 'undefined') {
+            updateInventoryValueChart(inventory);
+        }
+        if (typeof updateRecentActivity !== 'undefined') {
+            updateRecentActivity(devices, inventory);
+        }
         
     } catch (error) {
         console.error('Error loading chart data:', error);
-        if (typeof showNotification !== 'undefined') {
-            showNotification('Error loading chart data', 'danger');
-        }
+        // Don't show user notification for chart loading errors
     }
 }
 

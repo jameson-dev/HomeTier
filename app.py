@@ -1,3 +1,4 @@
+
 from flask import Flask, render_template, request, jsonify, make_response
 from flask_socketio import SocketIO, emit
 from backend.database import (
@@ -26,6 +27,17 @@ init_db()
 
 # Initialize network scanner
 scanner = NetworkScanner()
+
+# Error handling
+@app.errorhandler(500)
+def handle_internal_error(e):
+    print(f"Internal error: {e}")
+    return jsonify({'status': 'error', 'message': 'Internal server error'}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    print(f"Unhandled exception: {e}")
+    return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # Real-time monitoring class
 class RealtimeMonitor:
@@ -747,12 +759,17 @@ def get_dashboard_stats():
         
         conn.close()
         
-        return jsonify({
+        result = {
             'category_stats': [dict(row) for row in category_stats],
             'warranty_alerts': [dict(row) for row in warranty_alerts]
-        })
+        }
+        
+        return jsonify(result)
         
     except Exception as e:
+        print(f"Error in dashboard stats: {e}")
+        if 'conn' in locals():
+            conn.close()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/dashboard/network-health', methods=['GET'])
