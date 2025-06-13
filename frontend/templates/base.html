@@ -14,7 +14,7 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
-            <a class="navbar-brand" href="{{ url_for('index') }}">
+            <a class="navbar-brand" href="{{ url_for('pages.index') }}">
                 <i class="fas fa-network-wired me-2"></i>
                 HomeTier
             </a>
@@ -24,7 +24,7 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('index') }}">
+                        <a class="nav-link" href="{{ url_for('pages.index') }}">
                             <i class="fas fa-home me-1"></i>Dashboard
                         </a>
                     </li>
@@ -35,12 +35,12 @@
                         </a>
                         <ul class="dropdown-menu">
                             <li>
-                                <a class="dropdown-item" href="{{ url_for('inventory') }}">
+                                <a class="dropdown-item" href="{{ url_for('pages.inventory') }}">
                                     <i class="fas fa-list me-2"></i>Manage Inventory
                                 </a>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="{{ url_for('scanning') }}">
+                                <a class="dropdown-item" href="{{ url_for('pages.scanning') }}">
                                     <i class="fas fa-search me-2"></i>Network Scanning
                                 </a>
                             </li>
@@ -48,7 +48,7 @@
                                 <hr class="dropdown-divider">
                             </li>
                             <li>
-                                <a class="dropdown-item" href="{{ url_for('categories') }}">
+                                <a class="dropdown-item" href="{{ url_for('pages.categories') }}">
                                     <i class="fas fa-tags me-2"></i>Categories
                                 </a>
                             </li>
