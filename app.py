@@ -21,6 +21,9 @@ init_db()
 scanner = NetworkScanner()
 realtime_monitor = RealtimeMonitor(socketio, scanner)
 
+app.scanner = scanner
+app.realtime_monitor = realtime_monitor
+
 # Register all routes and events
 register_blueprints(app)
 register_socketio_events(socketio, realtime_monitor, scanner)
