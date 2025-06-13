@@ -89,12 +89,12 @@
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     
     <!-- Dashboard specific scripts -->
-    {% if request.endpoint == 'index' %}
+    {% if request.endpoint == 'pages.index' %}
     <script src="{{ url_for('static', filename='js/dashboard-charts.js') }}"></script>
     {% endif %}
 
     <!-- Categories specific scripts -->
-    {% if request.endpoint == 'categories' %}
+    {% if request.endpoint == 'pages.categories' %}
     <script src="{{ url_for('static', filename='js/categories.js') }}"></script>
     {% endif %}
     
